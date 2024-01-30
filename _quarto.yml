@@ -27,7 +27,7 @@ book:
         - href: Licenses.qmd
           text: "Licensing Code and Content"
   navbar:
-    logo: rice_hhd.png
+    logo: Data/images/rice_hhd.png
   page-footer: 
     center: 
       - text: "Copyright Houston Wastewater Epidemiology"
