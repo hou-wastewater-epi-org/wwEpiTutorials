@@ -1,0 +1,57 @@
+---
+title: Regression with Time Series
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| code-fold: true
+
+## load libraries
+library(readxl)
+library(tidyverse)
+library(knitr)
+library(lme4)
+library(caret)
+library(sjPlot)
+library(nlme)
+library(astsa)
+
+###### Load (synthetic data) files:
+synth_ww <- read.csv("Data/Synthetic_WW_PR.csv")
+
+```
+
+## A correlated error regression model
+
+We saw that the linear model's independence assumption was violated due to temporal correlation present in the residuals. The below fits a time series model to the data which explicitly models this correlation using the `correlation` argument of the `gls` function in the `nlme` package.
+
+```{r}
+# fit model with AR(1) structure
+m2 <- nlme::gls(SPR ~ SWWlog10cpd, data =synth_ww, correlation = nlme::corARMA(p=1, q = 0))
+summary(m2)
+```
+
+## Has the temporal structure been captured?
+
+```{r}
+astsa::acf1(residuals(m2, type = "normalized"))
+```
+
+No-- the plot here still looks very similar to the one for linear regression, indicating the temporal structure has not been captured.
+
+## Increasing lag
+
+The previous model only accounted for correlation for one lag (one week in the past). What about looking further back?
+
+```{r}
+# fit model with AR(2) structure
+ m3 <- nlme::gls(SPR ~ SWWlog10cpd, data =synth_ww, correlation = nlme::corARMA(value = c(0.8, 0.04), p=2, q = 0))
+summary(m3)
+```
+
+## Has the temporal structure been captured?
+
+```{r}
+astsa::acf1(residuals(m3, type = "normalized"))
+```

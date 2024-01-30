@@ -1,0 +1,33 @@
+# Authoring Publication-Ready Code
+
+## Development Phase
+
+1.  Initialize the repository with the appropriate template.
+
+2.  Author code as you usually would
+
+3.  When developing data products which are synthetic/have masked names, make sure none of the parts of this process are manual.
+
+## Review Phase
+
+1.  Authors review Editorial checklist
+
+2.  At least one person not involved with the authoring of the code downloads and attempts to run the code. 
+
+3.  Reviewer performed a data audit (see below)
+
+4.  Reviewer shares any issues with the codes authors
+
+## Release Phase
+
+1.  Verify the choice of license and obtain change approval from authors as necessary
+
+2.  Perform a data audit
+
+    1.  For example, If names of regions have been masked, search the code for the names that have been removed-- from comments, prose, and files
+
+    2.  Compare synthetic files to their real counterparts to ensure the synthetic versions contain only what should be public
+
+3.  Make the repository public.
+
+4.  Post release notice on analytics group website.

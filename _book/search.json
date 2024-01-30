@@ -1,0 +1,297 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Wastewater Epidemiology Data Science Tutorials",
+    "section": "",
+    "text": "Welcome to the tutorials page for Houston Wastewater Epidemiology!",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>Home</span>"
+    ]
+  },
+  {
+    "objectID": "TimeSeries.html",
+    "href": "TimeSeries.html",
+    "title": "Time Series Data",
+    "section": "",
+    "text": "When data are collected and referenced in time, such as weekly wastewater surveillance, the data may be correlated in time. In other words, the data are not independent.\nSince independence is an assumption of many common statistical models, such as linear regression, other tools are required when temporal correlation is present.\nThese tutorials demonstrate how to check for the presence of temporal correlation, and how to apply models that account for it.\nNote: these tutorials use synthetic data.",
+    "crumbs": [
+      "Time Series Data"
+    ]
+  },
+  {
+    "objectID": "Correlation.html#modeling-setup",
+    "href": "Correlation.html#modeling-setup",
+    "title": "2  Correlation and Autocorrelation",
+    "section": "2.1 Modeling setup",
+    "text": "2.1 Modeling setup\nSuppose you have two variables and would like to explore the relationship between them. One method is correlation, which measures the strength of the linear relationship between two variables. For example, you might want to measure the strength of the relationship between the \\(\\log_{10}\\) viral concentration measured in wastewater (WW) and the clinical positivity rate (PR) of that virus. You can compute correlation using the cor function in R. An example using synthetic wastewater and positivity rate is below.\n\n## compute the correlation\ncor(synth_ww$SWWlog10cpd, synth_ww$SPR)\n\n[1] 0.7577898\n\n\nIn addition, you might want to get a sense of how precise this estimate is: If 165 additional measurements were taken, how different would we expect the correlation to be compared to the observed value of 0.758? One way to answer this question would be to compute a confidence interval, or range of plausible values, for the (unobserved) true correlation between the wastewater measurements and the positivity rate.\n\nstats::cor.test(synth_ww$SWWlog10cpd,synth_ww$SPR)\n\n\n    Pearson's product-moment correlation\n\ndata:  synth_ww$SWWlog10cpd and synth_ww$SPR\nt = 14.827, df = 163, p-value &lt; 2.2e-16\nalternative hypothesis: true correlation is not equal to 0\n95 percent confidence interval:\n 0.6842243 0.8160885\nsample estimates:\n      cor \n0.7577898 \n\n\nThe 95% confidence interval is (0.684, 0.816), which means that if we took additional samples of 165 measurements and computed the correlation, we would expect the (unobserved) true correlation between WW and PR to fall between (0.684, 0.816) about 95% of the time.\nNote that the cor.test function also performed a hypothesis test. The null hypothesis of this test is that the true correlation between WW and PR is 0, and the alternative hypothesis is that the true correlation is not zero. The p-value for this test is very small, which means there is evidence to suggest that the true correlation between WW and PR is different from 0.\nHowever, there are assumptions for the confidence interval and hypothesis test, one of which is that the measurements are independent. In this context, because the data form a time series, the data should be checked for the presence of time dependence, also called autocorrelation (or temporal autocorrelation).",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Correlation and Autocorrelation</span>"
+    ]
+  },
+  {
+    "objectID": "Correlation.html#checking-for-autocorrelation",
+    "href": "Correlation.html#checking-for-autocorrelation",
+    "title": "2  Correlation and Autocorrelation",
+    "section": "2.2 Checking for autocorrelation",
+    "text": "2.2 Checking for autocorrelation\n\n2.2.1 Single-variable autocorrelation\nThe observations for each variable must be independent. For example, the positivity rate for a given week should not depend on the poistivity rate for the previous week. Already, this seems like an unreasonable assumption, but we can assess the presence of autocorrelation quantitatively.\nThe autocorrelation function (ACF) computes the correlation between a time series and itself lagged by a certain number of time points. For example, the lag 2 autocorrelation measures the correlation between today’s values and the values two weeks ago. When plotted, one can quickly determine whether autocorrelation is present and for which lags.\n\nastsa::acf1(synth_ww$SWWlog10cpd)\n\n\n\n\n\n\n\n\n\n\n [1]  0.95  0.85  0.72  0.56  0.38  0.21  0.06 -0.07 -0.17 -0.24 -0.28 -0.29\n[13] -0.29 -0.28 -0.25 -0.22 -0.18 -0.13 -0.08 -0.03  0.03  0.09  0.15\n\nastsa::acf1(synth_ww$SPR)\n\n\n\n\n\n\n\n\n\n\n [1]  0.95  0.85  0.70  0.53  0.35  0.18  0.02 -0.12 -0.22 -0.30 -0.35 -0.37\n[13] -0.38 -0.36 -0.33 -0.28 -0.21 -0.13 -0.04  0.04  0.13  0.20  0.26\n\n\nFor both the WW and PR variables, significant autocorrelation is present– for example, the lag 1 autocorrelation for PR is 0.95: the PR for a given week has a very strong linear association with the previous week’s PR.\nThis means there is a violation of the independence assumption for the confidence interval and hypothesis test shown above, meaning the results are likely incorrect because the standard error estimate for the correlation is incorrect.\n\n\n2.2.2 Two variable autocorrelation\nIn addition to autcorrelation in just the WW series or just the PR series, we can also examine the cross-correlation function (CCF) between the two series. The CCF computes the correlation between one variable and a lagged version of a second variable.\n\nastsa::ccf2(synth_ww$SWWlog10cpd,synth_ww$SPR, main = \"Corr(WW(t+lag),PR(t))\")\n\n\n\n\n\n\n\n\n\n## NOTE: Can also use these functions:\n# stats::ccf(synth_ww$SWWlog10cpd,synth_ww$SPR, main = \"Corr(WW(t+lag),PR(t))\")\n# astsa::ccf2(synth_ww$SWWlog10cpd,synth_ww$SPR, main = \"Corr(WW(t+lag),PR(t))\") \n# forecast::ggCcf(synth_ww$SWWlog10cpd,synth_ww$SPR)\n\nNotice that the CCF has both positive and negative lags. The positive lags compute the correlation between the PR series at a given time and the WW series k time periods in the future. For example, the CCF at lag 3 appears to be around 0.55, meaning that the correlation between PR and the WW three weeks in the future is about 0.55. The CCF at lag -10 is about -0.3, meaning the correlation between the PR and the WW 10 weeks in the past is -0.3. The lag 0 autocorrelation is simply the correlation we computed at the beginning, around 0.75– the correlation between the WW and PR for the same week.\nThis CCF indicates that the PR and WW are correlated with each other at various time lags— another way to violate the independence assumption required for cor.test. So, we need to explore techniques for analyzing the correlation between two variables that are autocorrelated.\n\n\n\n\n\n\nWhat if just one of the series is autocorrelated?\n\n\n\n\n\nNote if one series has zero autocorrelation at all lags, then the inference falls back to a variance of 1/n.\nIf there is NO autocorrelation in one series then cor.test is fine",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Correlation and Autocorrelation</span>"
+    ]
+  },
+  {
+    "objectID": "Correlation.html#example-of-correlation-test-for-autocorrelated-data",
+    "href": "Correlation.html#example-of-correlation-test-for-autocorrelated-data",
+    "title": "2  Correlation and Autocorrelation",
+    "section": "2.3 Example of correlation test for autocorrelated data",
+    "text": "2.3 Example of correlation test for autocorrelated data\nIn the language of time series introduced above, we can rephrase our original goal of “perform inference and compute confidence intervals for the correlation between WW and PR” as “perform inference on the lag 0 cross-correlation between WW and PR”.\nOne way to do this is to actually compute the correct standard error for the correlation based on the fact that each series is autocorrelated, then perform inference.\n\n\n\n\n\n\nTechnical details\n\n\n\n\n\nSee Theorem A.8 of TSA4 page 489. This is a large sample asymptotically normal result.\n\nThe mean is the respective lag h cross-correlation\nThe Variance of the cross-correlation at lag 0 in the normal distribution is (1/n)\n\n(sum over all lags of the product of the autocorrelation for each series)\n\n\n\n2.3.1 Additional notes\n\n\n\n\n\n\nWarning\n\n\n\n\n\nPoints: You can pre-whiten one series and then test for the “non-trend” correlation but this may defeat the purpose of the correlation excercise.\nAnother option is to actually compute the correct standard error for the correlation based on the fact that each series is autocorrelated.\nThe cross-correlation function computes the correlation at lags 0, +-1, +-2,…\nThe “pseudo-inference” for the ccf is based on WN - it is not correct for correlated data\n\n\n\n\n\n\n\n\n2.3.2 Step 1: Compute ACF for nlags required to see 0 autocorrelation.\n\nnlags = 50 # should not be more than 30% of data \nwwacf &lt;- acf(synth_ww$SWWlog10cpd, lag.max = nlags, plot=F)$acf \npracf &lt;- acf(synth_ww$SPR, lag.max = nlags, plot=F)$acf\n\n\ntail(wwacf) \n\n, , 1\n\n              [,1]\n[46,] -0.044850232\n[47,] -0.009453651\n[48,]  0.028429073\n[49,]  0.064165720\n[50,]  0.101340945\n[51,]  0.129273831\n\ntail(pracf)\n\n, , 1\n\n              [,1]\n[46,] -0.205249661\n[47,] -0.138464197\n[48,] -0.069787653\n[49,] -0.001864505\n[50,]  0.061276633\n[51,]  0.110591639\n\n\nCheck to see if at least one of autocorrelation series has diminished to zero.\nIf not then, up the number of lags.\n\n\n\n\n\n\nIncreasing lags\n\n\n\nYou should not increase the lags to greater than n/3. This is approximate and so getting the first terms helps; in our example the autocorrelation is highly persistent.\n\n\n\n\n2.3.3 Step 2: Compute standard error\n\nvar_cor &lt;- (1 + 2*sum(wwacf[2:nlags]*pracf[2:nlags]))/(dim(synth_ww)[1]) \nsterr_cor &lt;- sqrt(var_cor)\n\n\n\n2.3.4 Step 3: Hypothesis test that ccf(0)=0 vs not equal zero (two-sided test)\n\nccf0 &lt;- stats::cor(synth_ww$SWWlog10cpd,synth_ww$SPR) \n(ccf0pvalue &lt;- 2*(1-pnorm(abs(ccf0/sterr_cor))))\n\n[1] 0.001392252\n\n\n\n\n2.3.5 Step 4: Confidence interval for ccf(0) = contemporaneous correlation\nThese are large sample confidence intervals based on the normal distribution, so do not take into account the limitations on the correlation being bounded between -1 and 1\n\ntailp = (1-.05/2) # .05 corresponds to 95% interval\n(lclccf0 = max(-1,ccf0 - qnorm(tailp)*sterr_cor)) \n\n[1] 0.2931079\n\n(uclccf0 = min(ccf0 + qnorm(tailp)*sterr_cor,1))\n\n[1] 1\n\n\nMore precise inference is possible with a bit more trouble…",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Correlation and Autocorrelation</span>"
+    ]
+  },
+  {
+    "objectID": "Correlation.html#small-sample-sizes",
+    "href": "Correlation.html#small-sample-sizes",
+    "title": "2  Correlation and Autocorrelation",
+    "section": "2.4 Small sample sizes",
+    "text": "2.4 Small sample sizes\n\nsmall_sample &lt;- synth_ww[1:10,]\n\n\npacf(small_sample$SWWlog10cpd) #really only one lag is spiking (so set order.max below to 1)\n\n\n\n\n\n\n\n\n\n## acf will estimate too much, fit an AR(1) model\n## center each series before doing ar model (subtract the mean)\nar_ww &lt;- ar(small_sample$SWWlog10cpd - mean(small_sample$SWWlog10cpd), \n            order.max = 1, method = \"burg\")\nar_pr &lt;- ar(small_sample$SPR- mean(small_sample$SPR), \n            order.max = 1, method = \"burg\")\n\n## Theoretical ACF based on ar models\nww_acf_th &lt;- ARMAacf(ar = ar_ww$ar, lag.max = 10)\npr_acf_th &lt;- ARMAacf(ar = ar_pr$ar, lag.max = 10)\n\n## Compute new adjusted variance\nvar_cor_th &lt;- (1 + 2*sum(ww_acf_th[2:10]*pr_acf_th[2:10]))/(dim(synth_ww)[1]) \nsterr_cor_th &lt;- sqrt(var_cor_th)\n\n## compute p-value\nccf0_th &lt;- stats::cor(synth_ww$SWWlog10cpd,synth_ww$SPR) \n(ccf0pvalue_th &lt;- 2*(1-pnorm(abs(ccf0/sterr_cor_th))))\n\n[1] 5.567901e-06\n\nccf0pvalue_th\n\n[1] 5.567901e-06\n\n\nAnother small sample approach: sample autocorrelation when not significantly different, counted as 0 (truncated) (not ideal)",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>Correlation and Autocorrelation</span>"
+    ]
+  },
+  {
+    "objectID": "LinReg.html#visualization",
+    "href": "LinReg.html#visualization",
+    "title": "3  Attempting linear regression",
+    "section": "3.1 Visualization",
+    "text": "3.1 Visualization\nWe wish to model the relationship between the average wastewater samples for SARS-CoV-2 concentration and positivity rate. Based on the scatter plot below, a linear model seems to be a reasonable choice.\n\n\nCode\nregplot &lt;-\n  {ggplot(synth_ww, aes(x=SWWlog10cpd, y=SPR) ) +\n     \n      geom_point() +\n     \n      #geom_smooth(method=lm , color=\"blue\", fill=\"#69b3a2\", se=TRUE) +\n     \n      theme_bw(base_size=12) +\n     \n      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.title.x = element_text(size = 12)) +\n     \n      theme(axis.line.x = element_line(colour = 'black', linewidth = 0.5, linetype='solid'),\n            axis.line.y = element_line(colour = 'black', linewidth = 0.5, linetype='solid')) +\n     \n      ggtitle(\"\") +\n     \n      xlab(\"Average wastewater SARS-CoV-2 concentration (log10 copies/L)\") +\n      ylab(\"Positivity Rate\")\n   \n  } %&gt;%\n \n  print()",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Linear Regression</span>"
+    ]
+  },
+  {
+    "objectID": "LinReg.html#fitting-a-linear-regression-model",
+    "href": "LinReg.html#fitting-a-linear-regression-model",
+    "title": "3  Attempting linear regression",
+    "section": "3.2 Fitting a linear regression model",
+    "text": "3.2 Fitting a linear regression model\nA linear regression model is fit for the log of the mean of the wastewater samples on the positivity rate data.\nThe results in the table suggest a statistically significant relationship between log10 wastewater concentration and the positivity rate. Specifically, the coefficient 0.141 means that a one unit increase in log10 wastewater concentration is associated with an increase of approximately 0.141 in the positivity rate (and, with 95% confidence, this could be as low as 0.122 or as high as 0.160).\n\n\nCode\n###### Regression analysis\n\nm1 &lt;- lm(SPR ~ SWWlog10cpd, synth_ww)\ntab_model(summary(m1), show.se=TRUE, digits = 3)\n\n\n\n\n\n \nSPR\n\n\nPredictors\nEstimates\nstd. Error\nCI\np\n\n\n(Intercept)\n-1.707\n0.123\n-1.950 – -1.464\n&lt;0.001\n\n\nSWWlog10cpd\n0.141\n0.010\n0.122 – 0.160\n&lt;0.001\n\n\nObservations\n165\n\n\nR2 / R2 adjusted\n0.574 / 0.572\n\n\n\n\n\n\n\nHowever, the p-value (used to assess statistical significance) and confidence interval can be impacted by a violation of the assumptions of the linear model.\n\n\n\n\n\n\nVisualizing the fitted linear model\n\n\n\n\n\nThough the assumptions are violated (see below), the linear model structure still appears to capture the relationship between the viral concentration in the wastewater and the positivity rate.\nThe width of the bands around the estimated regression line will be most impacted by the presence of autocorrelation.\n\n\n`geom_smooth()` using formula = 'y ~ x'",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Linear Regression</span>"
+    ]
+  },
+  {
+    "objectID": "LinReg.html#checking-assumptions",
+    "href": "LinReg.html#checking-assumptions",
+    "title": "3  Attempting linear regression",
+    "section": "3.3 Checking assumptions",
+    "text": "3.3 Checking assumptions\nOne assumption of linear regression is independence, and is checked by examining the model’s standardized residuals. The below plot can be used to check this assumption for the case of time dependence.\n\n## estimate the lag1 autocorrelation\nacf_m1 &lt;- astsa::acf1(rstandard(m1))\n\n\n\n\n\n\n\n\n\n\nEach vertical line in the visualization represents the correlation between the observed time series and a lagged version of itself. For instance, the leftmost line demonstrates that the residual of each week is significantly correlated with the residual of the previous week, with a correlation coefficient of approximately 0.9. This finding suggests that the assumption of independence may be violated.\n\n\n\n\n\n\nWhat would a satisfied assumption look like?\n\n\n\n\n\nThe below is an example of a plot which does not violate the time-independence assumption of linear regression.\n\n\n\n\n\n\n\n\n\n\n\n [1] -0.06  0.12  0.09  0.05  0.04  0.06 -0.11  0.07  0.06 -0.15  0.00  0.07\n[13] -0.18  0.01  0.04 -0.06  0.05 -0.06  0.02 -0.05",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Linear Regression</span>"
+    ]
+  },
+  {
+    "objectID": "AR_error.html#a-correlated-error-regression-model",
+    "href": "AR_error.html#a-correlated-error-regression-model",
+    "title": "4  Regression with Time Series",
+    "section": "4.1 A correlated error regression model",
+    "text": "4.1 A correlated error regression model\nWe saw that the linear model’s independence assumption was violated due to temporal correlation present in the residuals. The below fits a time series model to the data which explicitly models this correlation using the correlation argument of the gls function in the nlme package.\n\n# fit model with AR(1) structure\nm2 &lt;- nlme::gls(SPR ~ SWWlog10cpd, data =synth_ww, correlation = nlme::corARMA(p=1, q = 0))\nsummary(m2)\n\nGeneralized least squares fit by REML\n  Model: SPR ~ SWWlog10cpd \n  Data: synth_ww \n       AIC      BIC  logLik\n  -868.722 -856.347 438.361\n\nCorrelation Structure: AR(1)\n Formula: ~1 \n Parameter estimate(s):\n      Phi \n0.9920493 \n\nCoefficients:\n                 Value  Std.Error   t-value p-value\n(Intercept) -0.8701159 0.16205341 -5.369315       0\nSWWlog10cpd  0.0824572 0.00977419  8.436224       0\n\n Correlation: \n            (Intr)\nSWWlog10cpd -0.782\n\nStandardized residuals:\n       Min         Q1        Med         Q3        Max \n-1.2502652 -0.8960309 -0.7518290 -0.4220495  0.5046423 \n\nResidual standard error: 0.1299889 \nDegrees of freedom: 165 total; 163 residual",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Regression with Time Series</span>"
+    ]
+  },
+  {
+    "objectID": "AR_error.html#has-the-temporal-structure-been-captured",
+    "href": "AR_error.html#has-the-temporal-structure-been-captured",
+    "title": "4  Regression with Time Series",
+    "section": "4.2 Has the temporal structure been captured?",
+    "text": "4.2 Has the temporal structure been captured?\n\nastsa::acf1(residuals(m2, type = \"normalized\"))\n\n\n\n\n\n\n\n\n\n\n [1]  0.36  0.43  0.26  0.12 -0.08 -0.07 -0.16 -0.19 -0.15 -0.03 -0.12 -0.06\n[13] -0.11 -0.11 -0.19 -0.11 -0.17 -0.13 -0.04  0.01  0.06  0.18  0.12\n\n\nNo– the plot here still looks very similar to the one for linear regression, indicating the temporal structure has not been captured.",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Regression with Time Series</span>"
+    ]
+  },
+  {
+    "objectID": "AR_error.html#increasing-lag",
+    "href": "AR_error.html#increasing-lag",
+    "title": "4  Regression with Time Series",
+    "section": "4.3 Increasing lag",
+    "text": "4.3 Increasing lag\nThe previous model only accounted for correlation for one lag (one week in the past). What about looking further back?\n\n# fit model with AR(2) structure\n m3 &lt;- nlme::gls(SPR ~ SWWlog10cpd, data =synth_ww, correlation = nlme::corARMA(value = c(0.8, 0.04), p=2, q = 0))\nsummary(m3)\n\nGeneralized least squares fit by REML\n  Model: SPR ~ SWWlog10cpd \n  Data: synth_ww \n        AIC       BIC   logLik\n  -988.6502 -973.1815 499.3251\n\nCorrelation Structure: ARMA(2,0)\n Formula: ~1 \n Parameter estimate(s):\n      Phi1       Phi2 \n 1.7871913 -0.8426947 \n\nCoefficients:\n                  Value  Std.Error   t-value p-value\n(Intercept)  0.25860287 0.08536406  3.029412  0.0029\nSWWlog10cpd -0.01049885 0.00648512 -1.618915  0.1074\n\n Correlation: \n            (Intr)\nSWWlog10cpd -0.984\n\nStandardized residuals:\n       Min         Q1        Med         Q3        Max \n-1.5193760 -0.7355810 -0.2550150  0.4182439  2.1917866 \n\nResidual standard error: 0.08472141 \nDegrees of freedom: 165 total; 163 residual",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Regression with Time Series</span>"
+    ]
+  },
+  {
+    "objectID": "AR_error.html#has-the-temporal-structure-been-captured-1",
+    "href": "AR_error.html#has-the-temporal-structure-been-captured-1",
+    "title": "4  Regression with Time Series",
+    "section": "4.4 Has the temporal structure been captured?",
+    "text": "4.4 Has the temporal structure been captured?\n\nastsa::acf1(residuals(m3, type = \"normalized\"))\n\n\n\n\n\n\n\n\n\n\n [1] -0.31  0.27  0.08  0.01 -0.08 -0.06 -0.02 -0.16  0.07 -0.02  0.07  0.05\n[13] -0.02  0.03 -0.04 -0.01 -0.07 -0.12  0.10  0.00 -0.10  0.23 -0.04",
+    "crumbs": [
+      "Time Series Data",
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Regression with Time Series</span>"
+    ]
+  },
+  {
+    "objectID": "AuthorCode.html#development-phase",
+    "href": "AuthorCode.html#development-phase",
+    "title": "5  Authoring Publication-Ready Code",
+    "section": "5.1 Development Phase",
+    "text": "5.1 Development Phase\n\nInitialize the repository with the appropriate template.\nAuthor code as you usually would\nWhen developing data products which are synthetic/have masked names, make sure none of the parts of this process are manual.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Development Process</span>"
+    ]
+  },
+  {
+    "objectID": "AuthorCode.html#review-phase",
+    "href": "AuthorCode.html#review-phase",
+    "title": "5  Authoring Publication-Ready Code",
+    "section": "5.2 Review Phase",
+    "text": "5.2 Review Phase\n\nAuthors review Editorial checklist\nAt least one person not involved with the authoring of the code downloads and attempts to run the code. \nReviewer performed a data audit (see below)\nReviewer shares any issues with the codes authors",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Development Process</span>"
+    ]
+  },
+  {
+    "objectID": "AuthorCode.html#release-phase",
+    "href": "AuthorCode.html#release-phase",
+    "title": "5  Authoring Publication-Ready Code",
+    "section": "5.3 Release Phase",
+    "text": "5.3 Release Phase\n\nVerify the choice of license and obtain change approval from authors as necessary\nPerform a data audit\n\nFor example, If names of regions have been masked, search the code for the names that have been removed– from comments, prose, and files\nCompare synthetic files to their real counterparts to ensure the synthetic versions contain only what should be public\n\nMake the repository public.\nPost release notice on analytics group website.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>Development Process</span>"
+    ]
+  },
+  {
+    "objectID": "EditorialChecklist.html#code",
+    "href": "EditorialChecklist.html#code",
+    "title": "6  Editorial Checklist",
+    "section": "6.1 Code",
+    "text": "6.1 Code\n\nFile has setup chunk (quarto only)\nFunctions are used with the package name, i.e. package::function()\n\nDo this even if the package is one of those that comes with R if there is another external package with the same name\n\n\n\n\n\n\n\nCaution\n\n\n\nCautionary tale: dplyr::filter() vs. stats::filter, dplyr::lag vs. base::lag\n\n\n\n\nComments are short and pertain to one or two lines of code (longer descriptions should go in the text)\nWithin reason, provide interpretations for each code chunk/set of outputs.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Editorial Checklist</span>"
+    ]
+  },
+  {
+    "objectID": "EditorialChecklist.html#text",
+    "href": "EditorialChecklist.html#text",
+    "title": "6  Editorial Checklist",
+    "section": "6.2 Text",
+    "text": "6.2 Text\n\nText contains summaries of code chunks and motivation for using the code in the chunk\nText should be free of spelling and grammatical errors which cause confusion\nAvoid the use of synonyms\n\n\n\n\n\n\nExample of synonym disambiguation\n\n\n\n\n\n\nOnline estimates (not filter, not real-time)\nRetrospective estimates (not smoother)\nMeasurement error \nTrend variability\nSeparation (not structural break, not mean shift, not structural deviation, not level shift)\nImputed\nTry to use hierarchical time series model (dynamic linear model vs. distributed lag model)\nSneak in signal and noise terminology\nTried to use sub-sewershed in methods (to match title/be more general) and liftstations in Results (to match our application)",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Editorial Checklist</span>"
+    ]
+  },
+  {
+    "objectID": "EditorialChecklist.html#visualizations",
+    "href": "EditorialChecklist.html#visualizations",
+    "title": "6  Editorial Checklist",
+    "section": "6.3 Visualizations",
+    "text": "6.3 Visualizations\n\nCheck color scheme is consistent throughout and is color blind friendly\nUse a legend every time a color scheme is used\nExplain acronyms\nLabels match document text (see synonyms above)\nEnsure that when outputting the images, the text is a readable size\nAdd image alt text",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Editorial Checklist</span>"
+    ]
+  },
+  {
+    "objectID": "EditorialChecklist.html#data",
+    "href": "EditorialChecklist.html#data",
+    "title": "6  Editorial Checklist",
+    "section": "6.4 Data",
+    "text": "6.4 Data\n\nEnsure that the explanation of each feature used in the analysis is available, both the raw and cleaned versions\nUse dplyr to avoid the creation of temporary data objects. If unavoidable, give them informative variable names and remove them from the environment when they are no longer needed. Do not re-assign new objects to existing object names",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>Editorial Checklist</span>"
+    ]
+  },
+  {
+    "objectID": "DataPrivacy.html#version-history",
+    "href": "DataPrivacy.html#version-history",
+    "title": "7  Data Privacy",
+    "section": "7.1 Version history",
+    "text": "7.1 Version history\nWhen you make a commit, you are essentially creating a snapshot of the current state of your project. When you push to the remote repository, that snapshot is merged with the project version stored in the cloud accessible by all on the project. \n\n\n\n\n\n\nNote\n\n\n\nNote that the entire version of the project history is available by viewing or restoring past commits. On the one hand, this is great– if you make a mistake and need to revert back to an earlier version you are easily able to do so. \n\n\nOn the other hand, it creates a challenge for data privacy. Suppose for example you are developing code for a research project with sensitive data and have a private repository. As a final step in the project you replace the real data with synthetic data and then make the repository public. It will still be possible to go into the version history of the project and view the real data!\nSo, the best practice is to create a fresh version of the repository with just the synthetic data, then make that public. \n\nEven if you delete past commits (e.g. follow these steps), it is very difficult to purge all traces of past commits completely– sometimes snapshots of the data will be stored in pull request history, etc. It’s best to just start fresh with a new repository if you find that sensitive data has been pushed.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Data Privacy</span>"
+    ]
+  },
+  {
+    "objectID": "DataPrivacy.html#creating-a-fresh-repository",
+    "href": "DataPrivacy.html#creating-a-fresh-repository",
+    "title": "7  Data Privacy",
+    "section": "7.2 Creating a fresh repository",
+    "text": "7.2 Creating a fresh repository\nIf you suspect that sensitive data has been pushed to the remote, take the following steps:\n\nMake the repo private– this will ensure that no further people can access the data while you fix the issue.\nDetermine the nature of the sensitive data that has been revealed (e.g. is it PII or just something you decided to keep private, was it the entire data set, etc)\nDownload a current copy of the repo in a new folder on your machine\nMake edits to the copy you just made until no sensitive data is included\nHave someone check your work\nSave a copy of the insights page (see “letting your team know”)\nDelete the old repo on github– this will ensure that all version history which may contain partial/complete copies of the sensitive data will not be accessible\nCreate a new repo with exactly the same name– this will ensure that any existing links to the repo will work once you are done with the fix\nAdd the fixed files to the new repo. Double check that there is no version history\nMake the new repo public",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Data Privacy</span>"
+    ]
+  },
+  {
+    "objectID": "DataPrivacy.html#letting-your-team-know",
+    "href": "DataPrivacy.html#letting-your-team-know",
+    "title": "7  Data Privacy",
+    "section": "7.3 Letting your team know",
+    "text": "7.3 Letting your team know\n\n\n\n\n\n\nImportant\n\n\n\nIf you discover that sensitive data has been publicly available, let your supervisor know immediately. Include the following information:\n\n\n\nHow long the publicly available data has been up \nThe exact nature of how it was available– was the entire data set included, or just small snapshots of it, etc\nSummarize the information contained on the insights page (e.g. total number of clones)\nSummarize the steps you took to remove the sensitive data and the current status",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Data Privacy</span>"
+    ]
+  },
+  {
+    "objectID": "DataPrivacy.html#whos-accessing-my-repository",
+    "href": "DataPrivacy.html#whos-accessing-my-repository",
+    "title": "7  Data Privacy",
+    "section": "7.4 Who’s accessing my repository?",
+    "text": "7.4 Who’s accessing my repository?\nYou can access some statistics about who is accessing your Git repository and navigating to the “Insights” tab. This will tell you things like page views and number of clones. Note that there is no way to know who is viewing the page or cloning your repository. \nWhen a repository is forked, you can see who has forked it. \nIf you find that someone has copied a version of the repo that contained sensitive information, you could try going through GitHub’s content removal process.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Data Privacy</span>"
+    ]
+  },
+  {
+    "objectID": "Licenses.html#choosing-a-license",
+    "href": "Licenses.html#choosing-a-license",
+    "title": "8  Licensing",
+    "section": "8.1 Choosing a License",
+    "text": "8.1 Choosing a License\n\n8.1.1 Code content\nSeveral open-source licenses are available and the website ChooseALicense.com is extremely helpful in understanding the choices.\nTwo popular licenses are the GNU GPLv3 license and the MIT License. GPL3 is more restrictive than MIT. Under the MIT license, your code can be used in a commercial product with or without modifications. Under GPL3, any software that derives from yours must also follow GPL3 (i.e., also have an open-source license). Note that this means it can still be used commercially, but that commercial software’s source must also be made available under a GNU GPLv3 license. This protection to keep open-source is nice but can lead to issues for people combining your code with other code with a different license.\n\n\n\n\n\n\nAdditional resources on licensing R code.\n\n\n\n\nLicensing R by Colin Fay, specifically Section 4.3\nR Packages (2e) by Hadley Wickham and Jennifer Bryan, specifically Chapter 12 on Licensing\n\n\n\n\n\n8.1.2 Non-code content \nThe Creative Commons licenses are provided by a non-profit and are intended to be used with content that is not code– for data. For datascience projects, that means any documentation/vignettes as well as data.\nSeveral options are possible, depending on the restrictions you want. Most of the content on the Houston Wastewater Epidemiology GitHub (including this tutorial) are licensed under a CC by-NC-SA (non-commercial, share alike). The License Chooser tool is helpful.\nBenefits of CC by-NC-SA. \n\nPrevents commercial use of the content by any entity without additional licensing\nAllows separate commercial (dual) licensing on a case-by-case basis if desired\nSomewhat strict– Requires adapters to also use a CC by-NC-SA license for any derivative content\nIf too strict, can always be re-released under a more permissive license (e.g., CC by-NC or CC by-SA) \n\nA good summary of the different licenses is on page 7 of this document.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Licensing Code and Content</span>"
+    ]
+  },
+  {
+    "objectID": "Licenses.html#implementing-a-license",
+    "href": "Licenses.html#implementing-a-license",
+    "title": "8  Licensing",
+    "section": "8.2 Implementing a License",
+    "text": "8.2 Implementing a License\nOnce you’ve chosen your license, you simply need to include a file that contains a copy of that license in your project directory that contains the content to be licensed. For example, you might include a “Code” folder that contains a GPLv3 license and a “Data” folder that contains a CC by-NC-SA license.\nYou may also want to include a summary of the licenses in a “License” section of a project repository’s README or project page.",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Licensing Code and Content</span>"
+    ]
+  },
+  {
+    "objectID": "Licenses.html#enforcing-a-license",
+    "href": "Licenses.html#enforcing-a-license",
+    "title": "8  Licensing",
+    "section": "8.3 Enforcing a License",
+    "text": "8.3 Enforcing a License\nIf you find that work is being used in a manner that is not compliant with the license, your next steps will depend on the particular content/license.\n\nCreative Commons violations\nGNU License violation",
+    "crumbs": [
+      "Project Management",
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Licensing Code and Content</span>"
+    ]
+  }
+]

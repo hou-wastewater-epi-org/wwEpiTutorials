@@ -1,0 +1,9 @@
+# Time Series Data {.unnumbered}
+
+When data are collected and referenced in time, such as weekly wastewater surveillance, the data may be correlated in time. In other words, the data are not independent.
+
+Since independence is an assumption of many common statistical models, such as linear regression, other tools are required when temporal correlation is present.
+
+These tutorials demonstrate how to check for the presence of temporal correlation, and how to apply models that account for it.
+
+Note: these tutorials use synthetic data.

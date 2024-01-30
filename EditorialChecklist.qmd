@@ -1,0 +1,67 @@
+# Editorial Checklist
+
+## Code
+
+-   File has setup chunk (quarto only)
+
+-   Functions are used with the package name, i.e. package::function()
+
+    -   Do this even if the package is one of those that comes with R if there is another external package with the same name
+
+        -   ::: callout-caution
+            Cautionary tale: dplyr::filter() vs. stats::filter, dplyr::lag vs. base::lag
+            :::
+
+-   Comments are short and pertain to one or two lines of code (longer descriptions should go in the text)
+
+-   Within reason, provide interpretations for each code chunk/set of outputs.
+
+## Text
+
+-   Text contains summaries of code chunks and motivation for using the code in the chunk
+
+-   Text should be free of spelling and grammatical errors which cause confusion
+
+-   Avoid the use of synonyms
+
+    ::: {.callout-note collapse="true"}
+    ## Example of synonym disambiguation
+
+    -   Online estimates (not filter, not real-time)
+
+    -   Retrospective estimates (not smoother)
+
+    -   Measurement error 
+
+    -   Trend variability
+
+    -   Separation (not structural break, not mean shift, not structural deviation, not level shift)
+
+    -   Imputed
+
+    -   Try to use hierarchical time series model (dynamic linear model vs. distributed lag model)
+
+    -   Sneak in signal and noise terminology
+
+    -   Tried to use sub-sewershed in methods (to match title/be more general) and liftstations in Results (to match our application)
+    :::
+
+## Visualizations
+
+-   Check color scheme is consistent throughout and is color blind friendly
+
+-   Use a legend every time a color scheme is used
+
+-   Explain acronyms
+
+-   Labels match document text (see synonyms above)
+
+-   Ensure that when outputting the images, the text is a readable size
+
+-   Add image [alt text](https://quarto.org/docs/authoring/figures.html)
+
+## Data
+
+-   Ensure that the explanation of each feature used in the analysis is available, both the raw and cleaned versions
+
+-   Use dplyr to avoid the creation of temporary data objects. If unavoidable, give them informative variable names and remove them from the environment when they are no longer needed. Do not re-assign new objects to existing object names

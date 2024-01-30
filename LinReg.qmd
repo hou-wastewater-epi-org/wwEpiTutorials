@@ -1,0 +1,142 @@
+---
+title: Attempting linear regression
+---
+
+::: {.callout-note collapse="true"}
+## Data import
+
+```{r}
+#| label: setup
+#| output: false
+#| code-fold: false
+
+# Load packages
+
+library(readxl)
+library(tidyverse)
+library(knitr)
+library(lme4)
+library(caret)
+library(sjPlot)
+library(nlme)
+library(astsa)
+
+###### Load (synthetic data) files:
+synth_ww <- read.csv("Data/Synthetic_WW_PR.csv")
+
+```
+:::
+
+## Visualization
+
+We wish to model the relationship between the average wastewater samples for SARS-CoV-2 concentration and positivity rate. Based on the scatter plot below, a linear model seems to be a reasonable choice.
+
+```{r}
+#| label: Visualization
+#| code-fold: true
+regplot <-
+  {ggplot(synth_ww, aes(x=SWWlog10cpd, y=SPR) ) +
+     
+      geom_point() +
+     
+      #geom_smooth(method=lm , color="blue", fill="#69b3a2", se=TRUE) +
+     
+      theme_bw(base_size=12) +
+     
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.title.x = element_text(size = 12)) +
+     
+      theme(axis.line.x = element_line(colour = 'black', linewidth = 0.5, linetype='solid'),
+            axis.line.y = element_line(colour = 'black', linewidth = 0.5, linetype='solid')) +
+     
+      ggtitle("") +
+     
+      xlab("Average wastewater SARS-CoV-2 concentration (log10 copies/L)") +
+      ylab("Positivity Rate")
+   
+  } %>%
+ 
+  print()
+
+```
+
+## Fitting a linear regression model
+
+A linear regression model is fit for the log of the mean of the wastewater samples on the positivity rate data.
+
+The results in the table suggest a statistically significant relationship between log10 wastewater concentration and the positivity rate. Specifically, the coefficient 0.141 means that a one unit increase in log10 wastewater concentration is associated with an increase of approximately 0.141 in the positivity rate (and, with 95% confidence, this could be as low as 0.122 or as high as 0.160).
+
+```{r}
+#| label: Analysis
+#| code-fold: true
+###### Regression analysis
+
+m1 <- lm(SPR ~ SWWlog10cpd, synth_ww)
+tab_model(summary(m1), show.se=TRUE, digits = 3)
+
+```
+
+However, the p-value (used to assess statistical significance) and confidence interval can be impacted by a violation of the assumptions of the linear model.
+
+::: {.callout-note collapse="true"}
+## Visualizing the fitted linear model
+
+Though the assumptions are violated (see below), the linear model structure still appears to capture the relationship between the viral concentration in the wastewater and the positivity rate.
+
+The width of the bands around the estimated regression line will be most impacted by the presence of autocorrelation.
+
+```{r}
+#| echo: false
+#| label: linear-model-visual
+regplot <-
+  {ggplot(synth_ww, aes(x=SWWlog10cpd, y=SPR) ) +
+     
+      geom_point() +
+     
+      geom_smooth(method=lm , color="blue", fill="#69b3a2", se=TRUE) +
+     
+      theme_bw(base_size=12) +
+     
+      theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), axis.title.x = element_text(size = 12)) +
+     
+      theme(axis.line.x = element_line(colour = 'black', linewidth = 0.5, linetype='solid'),
+            axis.line.y = element_line(colour = 'black', linewidth = 0.5, linetype='solid')) +
+     
+      ggtitle("") +
+     
+      xlab("Average wastewater SARS-CoV-2 concentration (log10 copies/L)") +
+      ylab("Positivity Rate")
+   
+  } %>%
+ 
+  print()
+
+```
+:::
+
+## Checking assumptions
+
+One assumption of linear regression is independence, and is checked by examining the model's standardized residuals. The below plot can be used to check this assumption for the case of time dependence.
+
+```{r}
+#| label: autocorrelation
+#| eval: true
+
+## estimate the lag1 autocorrelation
+acf_m1 <- astsa::acf1(rstandard(m1))
+```
+
+Each vertical line in the visualization represents the correlation between the observed time series and a lagged version of itself. For instance, the leftmost line demonstrates that the residual of each week is significantly correlated with the residual of the previous week, with a correlation coefficient of approximately 0.9. This finding suggests that the assumption of independence may be violated.
+
+::: {.callout-note collapse="true"}
+### What would a satisfied assumption look like?
+
+The below is an example of a plot which does not violate the time-independence assumption of linear regression.
+
+```{r}
+#| echo: false
+x <- rnorm(100)
+y <- 4*x + rnorm(100)
+
+astsa::acf1(residuals(lm(y~x)))
+```
+:::

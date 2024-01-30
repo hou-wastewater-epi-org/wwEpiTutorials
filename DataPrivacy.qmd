@@ -1,0 +1,62 @@
+# Data Privacy
+
+## **Version history**
+
+When you make a commit, you are essentially creating a snapshot of the current state of your project. When you push to the remote repository, that snapshot is merged with the project version stored in the cloud accessible by all on the project. 
+
+::: callout-note
+[Note that the entire version of the project history is available](https://happygitwithr.com/time-travel-see-past) by viewing or restoring past commits. On the one hand, this is great-- if you make a mistake and need to revert back to an earlier version you are easily able to do so. 
+:::
+
+On the other hand, it creates a challenge for data privacy. Suppose for example you are developing code for a research project with sensitive data and have a private repository. As a final step in the project you replace the real data with synthetic data and then make the repository public. It will still be possible to go into the version history of the project and view the real data!
+
+So, the best practice is to create a fresh version of the repository with just the synthetic data, then make that public. 
+
+\
+Even if you delete past commits (e.g. [follow these steps](https://stackoverflow.com/questions/13716658/how-to-delete-all-commit-history-in-github)), it is very difficult to purge all traces of past commits completely-- sometimes snapshots of the data will be stored in pull request history, etc. It's best to just start fresh with a new repository if you find that sensitive data has been pushed.
+
+## Creating a fresh repository
+
+If you suspect that sensitive data has been pushed to the remote, take the following steps:
+
+1.  Make the repo private-- this will ensure that no further people can access the data while you fix the issue.
+
+2.  Determine the nature of the sensitive data that has been revealed (e.g. is it PII or just something you decided to keep private, was it the entire data set, etc)
+
+3.  Download a current copy of the repo in a new folder on your machine
+
+4.  Make edits to the copy you just made until no sensitive data is included
+
+5.  Have someone check your work
+
+6.  Save a copy of the insights page (see "letting your team know")
+
+7.  Delete the old repo on github-- this will ensure that all version history which may contain partial/complete copies of the sensitive data will not be accessible
+
+8.  Create a new repo with exactly the same name-- this will ensure that any existing links to the repo will work once you are done with the fix
+
+9.  Add the fixed files to the new repo. Double check that there is no version history
+
+10. Make the new repo public
+
+## Letting your team know
+
+::: callout-important
+If you discover that sensitive data has been publicly available, let your supervisor know immediately. Include the following information:
+:::
+
+-   How long the publicly available data has been up 
+
+-   The exact nature of how it was available-- was the entire data set included, or just small snapshots of it, etc
+
+-   Summarize the information contained on the insights page (e.g. total number of clones)
+
+-   Summarize the steps you took to remove the sensitive data and the current status
+
+## Who's accessing my repository?
+
+You can access some statistics about who is accessing your Git repository and navigating to the "Insights" tab. This will tell you things like page views and number of clones. Note that there is no way to know who is viewing the page or cloning your repository. 
+
+When a repository is forked, you can see who has forked it. 
+
+If you find that someone has copied a version of the repo that contained sensitive information, you could try going through [GitHub's content removal process](https://docs.github.com/en/site-policy/content-removal-policies/github-private-information-removal-policy).

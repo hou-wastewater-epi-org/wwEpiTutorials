@@ -1,0 +1,46 @@
+project:
+  type: book
+
+book:
+  title: "Wastewater Epidemiology Data Science Tutorials"
+  author: "Katharine Britt, Julia Schedler, and Katherine Ensor"
+  date: "01/23/24"
+  chapters:
+    - href: index.qmd
+      text: "Home"
+    - part: TimeSeries.qmd
+      chapters:
+        - href: Correlation.qmd
+          text: "Correlation and Autocorrelation"
+        - href: LinReg.qmd
+          text: Linear Regression
+        - href: AR_error.qmd
+          text: Regression with Time Series
+    - part: Project Management
+      chapters:
+        - href: AuthorCode.qmd
+          text: "Development Process"
+        - href: EditorialChecklist.qmd
+          text: "Editorial Checklist"
+        - href: DataPrivacy.qmd
+          text: "Data Privacy"
+        - href: Licenses.qmd
+          text: "Licensing Code and Content"
+  navbar:
+    logo: rice_hhd.png
+  page-footer: 
+    center: 
+      - text: "Copyright Houston Wastewater Epidemiology"
+    left: 
+      - text: "About"
+        href: https://hou-wastewater-epi.org/
+    right:
+      - text: GitHub
+        href: https://github.com/hou-wastewater-epi-org
+format:
+  html:
+    theme: cosmo
+  pdf:
+    documentclass: scrreprt
+
+editor: visual

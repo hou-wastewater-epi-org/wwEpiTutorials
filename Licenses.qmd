@@ -1,0 +1,51 @@
+# Licensing
+
+Choosing the right license for your content and code is an important part of ensuring work is used by others as intended. This page focuses on the use case of providing open-source code for non-commercial use. Note that a lawyer did not write this page and the material here is only intended as a guide/introduction to the world of licensing data science content.
+
+## Choosing a License
+
+### Code content
+
+Several open-source licenses are available and the website [ChooseALicense.com](https://choosealicense.com/licenses/) is extremely helpful in understanding the choices.
+
+Two popular licenses are the GNU GPLv3 license and the MIT License. GPL3 is more restrictive than MIT. Under the MIT license, your code can be used in a commercial product with or without modifications. Under GPL3, any software that derives from yours must also follow GPL3 (i.e., also have an open-source license). Note that this means it can still be used commercially, but that commercial software's source must also be made available under a GNU GPLv3 license. This protection to keep open-source is nice but can lead to issues for people combining your code with other code with a different license.
+
+::: callout-note
+#### Additional resources on licensing R code.
+
+-   [Licensing R](https://thinkr-open.github.io/licensing-r/) by Colin Fay, specifically [Section 4.3](https://thinkr-open.github.io/licensing-r/rlicense.html#licensing-what-youre-writing)
+
+-   [R Packages (2e)](https://r-pkgs.org/) by Hadley Wickham and Jennifer Bryan, specifically [Chapter 12 on Licensing](https://r-pkgs.org/license.html)
+:::
+
+### Non-code content 
+
+The [Creative Commons](https://creativecommons.org/mission/) licenses are provided by a non-profit and are intended to be used with content that is not code– for data. For datascience projects, that means any documentation/vignettes as well as data.
+
+[Several options are possibl](https://creativecommons.org/share-your-work/cclicenses/)e, depending on the restrictions you want. Most of the content on the Houston Wastewater Epidemiology GitHub (including this tutorial) are licensed under a CC by-NC-SA (non-commercial, share alike). The [License Chooser](https://chooser-beta.creativecommons.org/) tool is helpful.
+
+Benefits of CC by-NC-SA. 
+
+-   Prevents commercial use of the content by any entity *without additional licensing*
+
+-   Allows separate commercial (dual) licensing on a case-by-case basis if desired
+
+-   Somewhat strict-- Requires adapters to also use a CC by-NC-SA license for any derivative content
+
+-   If too strict, can always be re-released under a more permissive license (e.g., CC by-NC or CC by-SA) 
+
+A good summary of the different licenses is on [page 7 of this document.](https://urldefense.com/v3/__https://thepowerofopen.org/assets/pdfs/tpoo_eng.pdf__;!!BuQPrrmRaQ!jFBfbC0J60tBKzFw0ERnRxy7fG88Z4y2x7pENCDHwpxCRthHxYgQKBc8uLq5WQFDNAMzXB-raEr4AgT7-UWQPUsmwcX0fFrqGA$)
+
+## Implementing a License
+
+Once you've chosen your license, you simply need to include a file that contains a copy of that license in your project directory that contains the content to be licensed. For example, you might include a "Code" folder that contains a GPLv3 license and a "Data" folder that contains a CC by-NC-SA license.
+
+You may also want to include a summary of the licenses in a "License" section of a project repository's README or project page.
+
+## Enforcing a License
+
+If you find that work is being used in a manner that is not compliant with the license, your next steps will depend on the particular content/license.
+
+-   [Creative Commons violations](https://creativecommons.org/misuse-of-works/)
+
+-   [GNU License violation](https://www.gnu.org/licenses/gpl-violation.html)

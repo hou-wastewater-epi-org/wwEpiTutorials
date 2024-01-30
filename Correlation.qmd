@@ -1,0 +1,207 @@
+---
+title: Correlation and Autocorrelation
+---
+
+```{r}
+#| label: setup
+#| output: false
+#| code-fold: true
+
+## load libraries
+library(readxl)
+library(tidyverse)
+library(knitr)
+library(lme4)
+library(caret)
+library(sjPlot)
+library(nlme)
+library(astsa)
+
+###### Load (synthetic data) files:
+synth_ww <- read.csv("Data/Synthetic_WW_PR.csv")
+
+```
+
+## Modeling setup
+
+Suppose you have two variables and would like to explore the relationship between them. One method is correlation, which measures the strength of the linear relationship between two variables. For example, you might want to measure the strength of the relationship between the $\log_{10}$ viral concentration measured in wastewater (WW) and the clinical positivity rate (PR) of that virus. You can compute correlation using the `cor` function in R. An example using synthetic wastewater and positivity rate is below.
+
+```{r}
+#| label: compute_correlation
+
+## compute the correlation
+cor(synth_ww$SWWlog10cpd, synth_ww$SPR)
+
+```
+
+In addition, you might want to get a sense of how precise this estimate is: If `{r} nrow(synth_ww)` additional measurements were taken, how different would we expect the correlation to be compared to the observed value of `{r} round(cor(synth_ww$SWWlog10cpd, synth_ww$SPR), 3)`? One way to answer this question would be to compute a confidence interval, or range of plausible values, for the (unobserved) true correlation between the wastewater measurements and the positivity rate.
+
+```{r}
+#| label: correlation_variability
+
+stats::cor.test(synth_ww$SWWlog10cpd,synth_ww$SPR)
+
+```
+
+The 95% confidence interval is (`{r} round(stats::cor.test(synth_ww$SWWlog10cpd,synth_ww$SPR)$conf.int,3)`), which means that if we took additional samples of `{r} nrow(synth_ww)` measurements and computed the correlation, we would expect the (unobserved) true correlation between WW and PR to fall between (`{r} round(stats::cor.test(synth_ww$SWWlog10cpd,synth_ww$SPR)$conf.int,3)`) about 95% of the time.
+
+Note that the `cor.test` function also performed a hypothesis test. The null hypothesis of this test is that the true correlation between WW and PR is 0, and the alternative hypothesis is that the true correlation is not zero. The p-value for this test is very small, which means there is evidence to suggest that the true correlation between WW and PR is different from 0.
+
+However, there are assumptions for the confidence interval and hypothesis test, one of which is that the measurements are independent. In this context, because the data form a time series, the data should be checked for the presence of time dependence, also called autocorrelation (or temporal autocorrelation).
+
+## Checking for autocorrelation
+
+### Single-variable autocorrelation
+
+The observations for each variable must be independent. For example, the positivity rate for a given week should not depend on the poistivity rate for the previous week. Already, this seems like an unreasonable assumption, but we can assess the presence of autocorrelation quantitatively.
+
+The autocorrelation function (ACF) computes the correlation between a time series and itself lagged by a certain number of time points. For example, the lag 2 autocorrelation measures the correlation between today's values and the values two weeks ago. When plotted, one can quickly determine whether autocorrelation is present and for which lags.
+
+```{r}
+#| label: compute-acf
+
+astsa::acf1(synth_ww$SWWlog10cpd)
+astsa::acf1(synth_ww$SPR)
+
+```
+
+For both the WW and PR variables, significant autocorrelation is present– for example, the lag 1 autocorrelation for PR is 0.95: the PR for a given week has a very strong linear association with the previous week's PR.
+
+This means there is a violation of the independence assumption for the confidence interval and hypothesis test shown above, meaning the results are likely incorrect because the standard error estimate for the correlation is incorrect.
+
+### Two variable autocorrelation
+
+In addition to autcorrelation in just the WW series or just the PR series, we can also examine the cross-correlation function (CCF) between the two series. The CCF computes the correlation between one variable and a lagged version of a second variable.
+
+```{r}
+#| label: compute-ccf
+
+astsa::ccf2(synth_ww$SWWlog10cpd,synth_ww$SPR, main = "Corr(WW(t+lag),PR(t))")
+
+## NOTE: Can also use these functions:
+# stats::ccf(synth_ww$SWWlog10cpd,synth_ww$SPR, main = "Corr(WW(t+lag),PR(t))")
+# astsa::ccf2(synth_ww$SWWlog10cpd,synth_ww$SPR, main = "Corr(WW(t+lag),PR(t))") 
+# forecast::ggCcf(synth_ww$SWWlog10cpd,synth_ww$SPR)
+```
+
+Notice that the CCF has both positive and negative lags. The positive lags compute the correlation between the PR series at a given time and the WW series k time periods in the future. For example, the CCF at lag 3 appears to be around 0.55, meaning that the correlation between PR and the WW three weeks in the future is about 0.55. The CCF at lag -10 is about -0.3, meaning the correlation between the PR and the WW 10 weeks in the past is -0.3. The lag 0 autocorrelation is simply the correlation we computed at the beginning, around 0.75-- the correlation between the WW and PR for the same week.
+
+This CCF indicates that the PR and WW are correlated with each other at various time lags— another way to violate the independence assumption required for `cor.test`. So, we need to explore techniques for analyzing the correlation between two variables that are autocorrelated.
+
+::: {.callout-note collapse="true"}
+## What if just one of the series is autocorrelated?
+
+Note if one series has zero autocorrelation at all lags, then the inference falls back to a variance of 1/n.
+
+If there is NO autocorrelation in one series then cor.test is fine
+:::
+
+## Example of correlation test for autocorrelated data
+
+In the language of time series introduced above, we can rephrase our original goal of "perform inference and compute confidence intervals for the correlation between WW and PR" as "perform inference on the lag 0 cross-correlation between WW and PR".
+
+One way to do this is to actually compute the correct standard error for the correlation based on the fact that each series is autocorrelated, then perform inference.
+
+
+::: {.callout-note collapse="true"}
+## Technical details
+
+See Theorem A.8 of TSA4 page 489. This is a large sample asymptotically normal result.
+
+-   The mean is the respective lag h cross-correlation
+-   The Variance of the cross-correlation at lag 0 in the normal distribution is (1/n)
+    -   (sum over all lags of the product of the autocorrelation for each series)
+
+### Additional notes
+
+::: {.callout-warning collapse="true"}
+Points: You can pre-whiten one series and then test for the "non-trend" correlation but this may defeat the purpose of the correlation excercise.
+
+Another option is to actually compute the correct standard error for the correlation based on the fact that each series is autocorrelated.
+
+The cross-correlation function computes the correlation at lags 0, +-1, +-2,...
+
+The "pseudo-inference" for the ccf is based on WN - it is not correct for correlated data
+:::
+:::
+
+### Step 1: Compute ACF for nlags required to see 0 autocorrelation.
+
+```{r}
+nlags = 50 # should not be more than 30% of data 
+wwacf <- acf(synth_ww$SWWlog10cpd, lag.max = nlags, plot=F)$acf 
+pracf <- acf(synth_ww$SPR, lag.max = nlags, plot=F)$acf
+```
+
+```{r}
+tail(wwacf) 
+tail(pracf)
+```
+
+Check to see if at least one of autocorrelation series has diminished to zero.
+
+If not then, up the number of lags.
+
+::: callout-note
+# Increasing lags
+
+You should not increase the lags to greater than n/3. This is approximate and so getting the first terms helps; in our example the autocorrelation is highly persistent.
+:::
+
+### Step 2: Compute standard error
+
+```{r}
+var_cor <- (1 + 2*sum(wwacf[2:nlags]*pracf[2:nlags]))/(dim(synth_ww)[1]) 
+sterr_cor <- sqrt(var_cor)
+```
+
+### Step 3: Hypothesis test that ccf(0)=0 vs not equal zero (two-sided test)
+
+```{r}
+ccf0 <- stats::cor(synth_ww$SWWlog10cpd,synth_ww$SPR) 
+(ccf0pvalue <- 2*(1-pnorm(abs(ccf0/sterr_cor))))
+```
+
+### Step 4: Confidence interval for ccf(0) = contemporaneous correlation
+
+These are large sample confidence intervals based on the normal distribution, so do not take into account the limitations on the correlation being bounded between -1 and 1
+
+```{r}
+tailp = (1-.05/2) # .05 corresponds to 95% interval
+(lclccf0 = max(-1,ccf0 - qnorm(tailp)*sterr_cor)) 
+(uclccf0 = min(ccf0 + qnorm(tailp)*sterr_cor,1))
+```
+
+More precise inference is possible with a bit more trouble...
+
+## Small sample sizes
+
+```{r}
+
+small_sample <- synth_ww[1:10,]
+
+
+pacf(small_sample$SWWlog10cpd) #really only one lag is spiking (so set order.max below to 1)
+
+## acf will estimate too much, fit an AR(1) model
+## center each series before doing ar model (subtract the mean)
+ar_ww <- ar(small_sample$SWWlog10cpd - mean(small_sample$SWWlog10cpd), 
+            order.max = 1, method = "burg")
+ar_pr <- ar(small_sample$SPR- mean(small_sample$SPR), 
+            order.max = 1, method = "burg")
+
+## Theoretical ACF based on ar models
+ww_acf_th <- ARMAacf(ar = ar_ww$ar, lag.max = 10)
+pr_acf_th <- ARMAacf(ar = ar_pr$ar, lag.max = 10)
+
+## Compute new adjusted variance
+var_cor_th <- (1 + 2*sum(ww_acf_th[2:10]*pr_acf_th[2:10]))/(dim(synth_ww)[1]) 
+sterr_cor_th <- sqrt(var_cor_th)
+
+## compute p-value
+ccf0_th <- stats::cor(synth_ww$SWWlog10cpd,synth_ww$SPR) 
+(ccf0pvalue_th <- 2*(1-pnorm(abs(ccf0/sterr_cor_th))))
+ccf0pvalue_th
+```
+
+Another small sample approach: sample autocorrelation when not significantly different, counted as 0 (truncated) (not ideal)
