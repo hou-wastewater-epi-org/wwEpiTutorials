@@ -1,0 +1,31 @@
+## Visualizing Multiple Time Series
+
+If you are visualizing time series for multiple locations and you will be sharing your plots on the web, avoiding scrolling through a bunch of plots will make your site more user-friendly.
+
+For example, here is the synthetic data for our paper
+
+```{r}
+
+
+plots <- all_ts_observed %>%
+          group_nest(name, keep = T) %>% 
+          deframe() %>%
+          map(., ~ {
+            missing_dates_lwr <- unique(.x$dates[which(.x$ts_missing)])
+            missing_dates_upr <- unique(.x$dates[which(.x$ts_missing)+1])[1:length(missing_dates_lwr)]
+            ggplot(.x, aes(x = dates, y = value, col = .x$colors)) +
+        theme_minimal()+
+        geom_line() + 
+        #ylim(2, 8) + 
+        labs(title = paste(.x$name[1]), x= "Date", y = "Log10 Copies/L-WW", color = "") +
+        geom_point(aes(x=dates, y=value)) +
+        scale_shape_manual(values = c(8, 19)) + 
+        scale_color_manual(values =  .x$colors[1], labels = "")+    
+              annotate("rect", 
+                         xmin = missing_dates_lwr, 
+                         xmax  = missing_dates_upr, 
+                         ymin = 3, ymax = 8, alpha = .1) + 
+        theme(legend.position = "none")
+          })
+
+```

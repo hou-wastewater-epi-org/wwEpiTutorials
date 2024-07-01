@@ -16,6 +16,9 @@ book:
           text: Linear Regression
         - href: AR_error.qmd
           text: Regression with Time Series
+    - part: Visualizations
+        - href: Tabs.qmd
+        - text: "Clickable Tabs"
     - part: Project Management
       chapters:
         - href: AuthorCode.qmd
