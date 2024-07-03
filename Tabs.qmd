@@ -1,31 +1,124 @@
-## Visualizing Multiple Time Series
+# Visualizing Multiple Time Series
 
 If you are visualizing time series for multiple locations and you will be sharing your plots on the web, avoiding scrolling through a bunch of plots will make your site more user-friendly.
 
-For example, here is the synthetic data for our paper
+## Generating some data
+
+We have previously generated and processed synthetic wastewater data from 5 different locations.
 
 ```{r}
+library(tidyverse, quietly = T, verbose = F)
 
+## read in synthetic data:
+all_ts_observed <- read.csv("https://raw.githubusercontent.com/hou-wastewater-epi-org/online_trend_estimation/main/Data/synthetic_ww_time_series.csv") 
+
+## formate date column as dates
+all_ts_observed <- all_ts_observed %>% mutate(dates = as.Date(dates))
+
+head(all_ts_observed)
+```
+
+## Creating tab visuals
+
+There are three steps:
+
+-   develop basic visual for one time series
+-   use the `map` function to create a visual for each time series in a list
+-   create the tabs using `panel-tabset` and the `iwalk` function.
+
+### Develop visual:
+
+I recommend first developing your visualization code in the usual way with just one series as it is easier to troubleshoot if you run into errors.
+
+```{r}
+## extract time series for one location:
+one_series <- all_ts_observed %>% dplyr::filter(name == "WWTP") 
+
+ggplot(one_series, aes(x = dates, y = value, col = colors)) +
+        theme_minimal()+
+        geom_line() + 
+        labs(title = paste(one_series$name[1]), x= "Date", y = "Log10 Copies/L-WW", color = "") +
+        geom_point(aes(x=dates, y=value)) +
+        theme(legend.position = "none", 
+              axis.text.x.bottom = element_text(angle = 65)) + 
+        scale_x_date(date_breaks = "1 month", date_labels = "%b %d %y")
+## put table underneath for other viruses? (patchwork package)
+```
+
+### Use `map`: Generate list of visuals
+
+The basic format of the code to generate a list of visuals is below.
+
+::: callout-note
+## Data format
+
+The below code assumes you have your data stored in a data frame or tibble "stacked"-- a row for every *date* for each *location*. If your data is stored in a different format (for example a list containing a data frame for each location), the first few lines of code before the call to `map` may look a bit different.
+:::
+
+```{r}
+#| eval: false
+
+plots <- ** data set name **  %>%
+          group_nest(** tab variable **, keep = T) %>% 
+          deframe() %>%
+          map(., ~ {
+            ## paste plot code here, replace "one_series" with ".x"
+          })
+
+```
+
+Unfold the code for the solution!
+
+```{r}
+#| eval: true
+#| code-fold: true
+library(tidyverse)
 
 plots <- all_ts_observed %>%
           group_nest(name, keep = T) %>% 
           deframe() %>%
           map(., ~ {
-            missing_dates_lwr <- unique(.x$dates[which(.x$ts_missing)])
-            missing_dates_upr <- unique(.x$dates[which(.x$ts_missing)+1])[1:length(missing_dates_lwr)]
-            ggplot(.x, aes(x = dates, y = value, col = .x$colors)) +
+           ggplot(.x, aes(x = as.Date(dates), y = value, col = colors)) +
         theme_minimal()+
         geom_line() + 
-        #ylim(2, 8) + 
         labs(title = paste(.x$name[1]), x= "Date", y = "Log10 Copies/L-WW", color = "") +
         geom_point(aes(x=dates, y=value)) +
-        scale_shape_manual(values = c(8, 19)) + 
-        scale_color_manual(values =  .x$colors[1], labels = "")+    
-              annotate("rect", 
-                         xmin = missing_dates_lwr, 
-                         xmax  = missing_dates_upr, 
-                         ymin = 3, ymax = 8, alpha = .1) + 
-        theme(legend.position = "none")
+        theme(legend.position = "none", 
+              axis.text.x.bottom = element_text(angle = 65)) + 
+        scale_x_date(date_breaks = "1 month", date_labels = "%b %d %y")
           })
 
 ```
+
+### Creating the tabs using `panel-tabset` and `iwalk()`:
+
+You will need to use some of the callout functionality of quarto for this!
+
+Below is a screenshot of how the code which generates the tabs looks in the editor for both source and visual model.
+
+::: {layout-ncol="2"}
+![](Data/images/panel_tabset_source.png){fig-align="left"}
+
+![](Data/images/panel_tabset_visual.png){fig-align="right"}
+:::
+
+Note that in the function call to `cat` the number of \# is one plus the number used to create the header for the section you want the tabs to appear under. I recommend troubleshooting in source mode.
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| label: tabs-series
+#| echo: true
+
+iwalk(plots, ~ {
+  cat('#### ', .y, '\n\n')
+  
+  print(.x)
+  
+  cat('\n\n')
+  
+})
+
+```
+:::
