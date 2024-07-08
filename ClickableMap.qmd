@@ -27,3 +27,5 @@ Stretch goal (don't think about this now)
 -   have a slider for time points, and clickable map
 
 -   have the ability to filter with different viruses
+
+## Jose's stuff goes below here!

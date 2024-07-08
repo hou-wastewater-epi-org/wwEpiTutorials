@@ -11,3 +11,7 @@ Include any information about caching/reading in a file/expected run time: <http
 Make sure you push!
 
 Feel free to use our Friday email as an example!
+
+Be clear about whether you're asking someone to render in individual *file* or the entire quaro book/website.
+
+## Jose's stuff goes below here

@@ -21,11 +21,13 @@ book:
         - href: Tabs.qmd
           text: Clickable Tabs
         - href: ClickableMap.qmd
-          text: Clickable Maps?
+          text: "DRAFT Clickable Maps?"
     - part: Project Management
       chapters:
         - href: AuthorCode.qmd
           text: "Development Process"
+        - href: EmailCollaborations.qmd
+          text: "DRAFT: Communicating over email"
         - href: EditorialChecklist.qmd
           text: "Editorial Checklist"
         - href: DataPrivacy.qmd
