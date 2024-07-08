@@ -1,0 +1,13 @@
+# What to put in an email question about code (in a single email)?
+
+1.  Name of file you are referencing
+2.  Code line number and name of code chunk
+3.  Screenshot/copy paste of error
+
+Also: make sure you close Rstudio and run the code in a new session with a clear workspace to "simulate" what the other person will see when you run your code.
+
+Include any information about caching/reading in a file/expected run time: <https://quarto.org/docs/computations/caching.html#knitr-cache> (or outputting data files so that the code runs faster)
+
+Make sure you push!
+
+Feel free to use our Friday email as an example!

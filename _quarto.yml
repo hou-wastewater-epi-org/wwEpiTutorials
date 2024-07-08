@@ -20,6 +20,8 @@ book:
       chapters:
         - href: Tabs.qmd
           text: Clickable Tabs
+        - href: ClickableMap.qmd
+          text: Clickable Maps?
     - part: Project Management
       chapters:
         - href: AuthorCode.qmd

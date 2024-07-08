@@ -1,0 +1,29 @@
+Can we have an interactive map where you can click a WWTP and have a graph pop up? (so like clickable tabs, but instead of tabs, it's a map)
+
+Use case: sending weekly reports of the weekly wwepi system to the health department
+
+-   1 map of 37 wwtps
+
+-   1 time series data set (visualization) for each of the wwtps
+
+-   each week, a report is sent where each time series plot has one new observation
+
+    -   needs to run by just reading in a new data file
+
+Starting point:
+
+-   <https://tmieno2.github.io/R-as-GIS-for-Economists/interactive-view-of-an-sf-object.html>
+
+-   your code for the mapping of a gif
+
+Goals:
+
+1.  minimal example– one clickable map that allows you to see the 37 time series plots
+2.  Create tutorial for anything that isn't easy for an R user comfortable with sf, ggplot, tidyverse
+3.  Create a demonstration of the weekly workflow (if minimal example is created using wwtp_070824.Rdata, then show how to update the minimal example using a new data set like wwtp_071524.Rdata)
+
+Stretch goal (don't think about this now)
+
+-   have a slider for time points, and clickable map
+
+-   have the ability to filter with different viruses
