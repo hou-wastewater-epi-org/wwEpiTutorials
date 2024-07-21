@@ -102,7 +102,6 @@ In the language of time series introduced above, we can rephrase our original go
 
 One way to do this is to actually compute the correct standard error for the correlation based on the fact that each series is autocorrelated, then perform inference.
 
-
 ::: {.callout-note collapse="true"}
 ## Technical details
 

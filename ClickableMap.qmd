@@ -1,14 +1,11 @@
+---
+title: "Interactive Map with Clickable Points Displaying Graphs"
+author: "Julia Schedler & Jose Palacio"
+format: html
+editor: visual
+---
+
 Can we have an interactive map where you can click a WWTP and have a graph pop up? (so like clickable tabs, but instead of tabs, it's a map)
-
-Use case: sending weekly reports of the weekly wwepi system to the health department
-
--   1 map of 37 wwtps
-
--   1 time series data set (visualization) for each of the wwtps
-
--   each week, a report is sent where each time series plot has one new observation
-
-    -   needs to run by just reading in a new data file
 
 Starting point:
 
@@ -29,3 +26,224 @@ Stretch goal (don't think about this now)
 -   have the ability to filter with different viruses
 
 ## Jose's stuff goes below here!
+
+
+Yes, we can! Here's a minimal example of how to create an interactive map with clickable points that display a graph when clicked. The example uses the `mapview` package to create the interactive map and the `popupGraph` function to display the graph when a point is clicked.
+
+Use case: sending weekly reports of the weekly wwepi system to the health department
+
+1.  Libraries needed
+
+-   The `mapview` package (for interactive maps) has many dependencies that need to be loaded.
+-   The `popupGraph` function is used to display the time series plot when a point is clicked.
+-   The function `mapview` and `popupGraph` are functions from the `mapview` package.
+-   Other libraries are used for data manipulation, visualization, and other tasks.
+-   The `options(warn = -1)` line is used to suppress warnings.
+
+```{r}
+#| results: asis
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| outout: false
+#| label: MARSS-libraries
+
+library(MARSS)
+library(tidyverse)
+library(KFAS)
+library(ggplot2)
+library(astsa)
+library(dplyr)
+library(tseries)
+library(knitr)
+library(latexpdf)
+library(tibble)
+library(kableExtra)
+library(forecast)
+library(qcc)
+library(ggnewscale)
+library(sf)
+library(png)
+library(rnaturalearth)
+library(leaflet)
+library(leafpop)
+library(leaflet.providers)
+library(mapview)
+options(warn = -1)
+```
+
+2.  Load the data
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: load-data
+
+load("Data/all_ts_observed_2023_05_29")
+load("Data/case_wwtp_ag") 
+source("Code/fplot.R")
+```
+
+3.  Load the shapefile:
+    - Note that we had to make some modifications to the shapefile to match the data.
+    - We had to rename the column to "Name" and remove some WWTPs that were not in the data.
+    - We also had to put the WWTPs in alphabetical order for easier computation.
+    - We also had to remove Sims Bayou and Kingwood from the shapefile.
+    - Finally, we had to add an id column to the shapefile.
+    - The shapefile is loaded using the `read_sf` function from the `sf` package.
+    - The functions `mutate`, `filter`, and `arrange` are from the `dplyr` package.
+    - the function `toupper` and `rbind` are from the `base` package.
+    
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: shape-data
+
+# Load the shapefile
+wwtp_shp <- sf::read_sf("Data/WWTP_061621/WWTP_061621.shp")
+names(wwtp_shp)[1] <- "Name" # rename column
+wastelake_shp <- wwtp_shp %>% 
+  dplyr::filter(Name %in% c("West Lake Houston")) %>% # filter
+  dplyr::mutate(Name = "West Lake") # rename
+wwtp_shp <- base::rbind(wwtp_shp, wastelake_shp) 
+wwtp_shp <- wwtp_shp[wwtp_shp$Name != "West Lake Houston",] # remove west lake
+wwtp_shp <- wwtp_shp[wwtp_shp$Name != "MC MUD #48",] # remove MC MUD #48
+wwtp_shp$Name <- base::toupper(wwtp_shp$Name) # upper case
+## put in alphabetical order for easier computation
+wwtp_shp <- wwtp_shp %>% 
+  dplyr::arrange(Name)
+wwtp_shp$id <- 1:37 
+# Omit Sims Bayou and Kingwood
+wwtp_shp <- wwtp_shp %>% 
+  dplyr::filter(Name != "SIMS BAYOU" & Name != "KINGWOOD")
+```
+
+4.  Time series plots
+    - The time series plots are created using the `ggplot2` package.
+    - The `group_nest` function is used to group the data by WWTP and create a list of data frames.
+    - The `map` function is used to create a list of time series plots for each WWTP.
+    - The plots are created using the `ggplot` function and the `geom_line` and `geom_point` functions.
+    - The `scale_shape_manual` function is used to set the shape of the points in the plot.
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: time-series
+
+# Time Series Plots
+ts_plots <- all_ts_observed %>%
+          dplyr::group_nest(WWTP, keep = T) %>% 
+          tibble::deframe() %>%
+          purrr::map(., ~ {
+            ggplot2::ggplot(.x, aes(x = date, y = log10cpl)) +
+              ggplot2::theme_minimal()+
+              ggplot2::geom_line() + 
+              ggplot2::labs(title = .x$WWTP, x= "Date", y = "Log10 Copies/L-WW", color = "") +
+              ggplot2::geom_point(aes(x=date, y=log10cpl)) +
+              ggplot2::labs(color = "") +
+              ggplot2::scale_shape_manual(values = c(8, 19))
+            })
+```
+
+5.  Create the interactive map with clickable points. Note that: 
+    - The `popupGraph` function is used to display the time series plot when a 
+      point is clicked. 
+    - Also, we omit Sims Bayou, Sims Bayou North, Sims Bayou South, 
+      Kingwood Central, and Kingwood West from the map. 
+    - One time series data set (visualization) for each of the WWTPs
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: time-series-map
+
+# Omit Sims Bayou, Sims Bayou North, Sims Bayou South, Kingwood Central, and Kingwood West
+mapview::mapView(wwtp_shp, zcol = "Name", legend = FALSE, 
+        popup = leafpop::popupGraph(ts_plots[-c(15, 16, 25, 26, 27)], width = 300, height = 300))
+```
+
+6.  Update the time series plots with new data points. Each week, a report is sent where each time series plot has one new observation
+    -   This run by just reading in a new data file and updating the existing data with new observations.
+    -   The new data is simulated for the current week by adding random noise to the existing data.
+    -   The new data only contains the new observations for the current week at each WWTP.
+    
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: Updated-time-series-plots
+
+# Function to load the new data file
+load_new_data <- function(file_path) {
+  new_data <- utils::read.csv(file_path)
+  return(new_data)
+}
+
+# Function to update the existing data with new observations
+update_data <- function(existing_data, new_data) {
+  updated_data <- base::rbind(existing_data, new_data)
+  return(updated_data)
+}
+
+existing_data <- all_ts_observed
+
+# Simulate new data for the current week
+new_data <- existing_data %>%
+  dplyr::filter(date == max(date)) %>%
+  dplyr::mutate(date = date + 7,  # Simulate next week's data
+         log10cpl = log10cpl + rnorm(n(), 0, 0.1))
+
+# Update the data
+all_ts_observed <- update_data(existing_data, new_data)
+
+# Function to create time series plots with new data points highlighted in red
+updated_ts_plot <- function(data, new_data) {
+  ggplot2::ggplot(data, aes(x = date, y = log10cpl)) +
+    ggplot2::theme_minimal() +
+    ggplot2::geom_line() +
+    ggplot2::labs(title = unique(data$WWTP), x = "Date", y = "Log10 Copies/L-WW", color = "") +
+    ggplot2::geom_point(aes(x = date, y = log10cpl)) +
+    ggplot2::geom_point(data = new_data, aes(x = date, y = log10cpl), color = "red", size = 3) +
+    ggplot2::labs(color = "") +
+    ggplot2::scale_shape_manual(values = c(8, 19))
+}
+
+# Generate the plots with highlighted new points
+ts_plots <- all_ts_observed %>%
+  dplyr::group_nest(WWTP, keep = TRUE) %>%
+  tibble::deframe() %>%
+  purrr::map(., ~ {
+    new_data_point <- new_data %>% 
+      dplyr::filter(WWTP == .x$WWTP[1])
+    updated_ts_plot(.x, new_data_point)
+  })
+
+# Remove specific indices if necessary (15, 16, 25, 26, 27)
+ts_plots <- ts_plots[-c(15, 16, 25, 26, 27)]
+```
+
+7.  Update the interactive map with the new time series plots.
+    -   1 time series data set (visualization) for each of the wwtps
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: Updated-time-series-map
+
+# Create the map with popup graphs
+mapview::mapview(wwtp_shp, zcol = "Name", legend = FALSE, 
+               popup = leafpop::popupGraph(ts_plots, width = 300, height = 300))
+
+```
