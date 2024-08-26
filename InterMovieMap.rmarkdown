@@ -1,0 +1,1143 @@
+---
+title: "Movie and Interactive Maps"
+author: "Julia Schedler & Jose Palacio"
+---
+
+---
+title: "Movie and Interactive Maps"
+author: "Julia Schedler & Jose Palacio"
+format: html
+editor: visual
+---
+
+
+Can we have an interactive map where you can click a WWTP and have a graph pop up? (so like clickable tabs, but instead of tabs, it's a map)
+
+Starting point:
+
+-   <https://tmieno2.github.io/R-as-GIS-for-Economists/interactive-view-of-an-sf-object.html>
+
+-   your code for the mapping of a gif
+
+Goals:
+
+1.  minimal example– one clickable map that allows you to see the 37 time series plots (Done)
+2.  Create tutorial for anything that isn't easy for an R user comfortable with sf, ggplot, tidyverse (Done)
+3.  Create a demonstration of the weekly workflow (if minimal example is created using wwtp_070824.Rdata, then show how to update the minimal example using a new data set like wwtp_071524.Rdata) (Done)
+
+Stretch goal (don't think about this now)
+
+-   have a slider for time points, and clickable map
+
+-   have the ability to filter with different viruses
+
+## Jose's stuff goes below here!
+
+Yes, we can! Here's a minimal example of how to create an interactive map with clickable points that display a graph when clicked. The example uses the `mapview` package to create the interactive map and the `popupGraph` function to display the graph when a point is clicked.
+
+Use case: sending weekly reports of the weekly wwepi system to the health department
+
+1.  Libraries needed
+
+-   The `mapview` package (for interactive maps) has many dependencies that need to be loaded.
+-   The `popupGraph` function is used to display the time series plot when a point is clicked.
+-   The function `mapview` and `popupGraph` are functions from the `mapview` package.
+-   Other libraries are used for data manipulation, visualization, and other tasks.
+
+
+```{r}
+#| results: asis
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| outout: false
+#| label: MARSS-libraries
+
+library(MARSS)
+library(tidyverse)
+library(KFAS)
+library(ggplot2)
+library(astsa)
+library(dplyr)
+library(tseries)
+library(knitr)
+library(latexpdf)
+library(tibble)
+library(kableExtra)
+library(forecast)
+library(qcc)
+library(ggnewscale)
+library(sf)
+library(png)
+library(rnaturalearth)
+library(leaflet)
+library(leafpop)
+library(leaflet.providers)
+library(mapview)
+library(patchwork)
+library(ggthemes)
+library(ggrepel)
+library(plotly)
+library(gganimate)
+library(gifski)
+library(magick)
+library(gapminder)
+library(av)
+library(cowplot)
+```
+
+
+2.  Load the data
+
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: load-data
+
+load("Data/synthetic_data")
+load("Data/case_wwtp_ag") 
+source("Code/fplot.R")
+```
+
+
+3.  Load the shapefile:
+    -   Note that we had to make some modifications to the shapefile to match the data.
+    -   We had to rename the column to "Name" and remove some WWTPs that were not in the data.
+    -   We also had to put the WWTPs in alphabetical order for easier computation.
+    -   We also had to remove Sims Bayou and Kingwood from the shapefile.
+    -   Finally, we had to add an id column to the shapefile.
+    -   The shapefile is loaded using the `read_sf` function from the `sf` package.
+    -   The functions `mutate`, `filter`, and `arrange` are from the `dplyr` package.
+    -   the function `toupper` and `rbind` are from the `base` package.
+
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: shape-data
+
+# Load the shapefile
+wwtp_shp <- sf::read_sf("Data/WWTP_061621/WWTP_061621.shp")
+names(wwtp_shp)[1] <- "Name" # rename column
+wastelake_shp <- wwtp_shp %>% 
+  dplyr::filter(Name %in% c("West Lake Houston")) %>% # filter
+  dplyr::mutate(Name = "West Lake") # rename
+wwtp_shp <- base::rbind(wwtp_shp, wastelake_shp) 
+wwtp_shp <- wwtp_shp[wwtp_shp$Name != "West Lake Houston",] # remove west lake
+wwtp_shp <- wwtp_shp[wwtp_shp$Name != "MC MUD #48",] # remove MC MUD #48
+wwtp_shp$Name <- base::toupper(wwtp_shp$Name) # upper case
+## put in alphabetical order for easier computation
+wwtp_shp <- wwtp_shp %>% 
+  dplyr::arrange(Name)
+wwtp_shp$id <- 1:37 
+# Omit Sims Bayou and Kingwood
+wwtp_shp <- wwtp_shp %>% 
+  dplyr::filter(Name != "SIMS BAYOU" & Name != "KINGWOOD")
+```
+
+
+4.  Time series plots
+    -   The following data is synthetic data generated using the MARSS package.
+    -   The data is in the form of a matrix where each column is a time series for a WWTP.
+    -   The data is loaded using the `load` function.
+    -   The last column is the date.
+    -   The time series plots are created using the `ggplot2` package.
+    -   The `map` function is used to create a list of time series plots for each WWTP.
+    -   The plots are created using the `ggplot` function and the `geom_line` and `geom_point` functions.
+    -   The `scale_shape_manual` function is used to set the shape of the points in the plot.
+
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: time-series
+
+ts_data <- synthetic_data
+ts_matrix <- synthetic_data[, -ncol(synthetic_data)]
+dates <- synthetic_data$date
+wwtp_names <- colnames(ts_matrix)
+ts_plots <- list()
+
+# Create a list of time series plots for each WWTP
+ts_plots <- lapply(1:length(wwtp_names), function(i) {
+  ggplot2::ggplot(data = ts_data, aes(x = dates, y = ts_matrix[, i])) +
+    ggplot2::theme_minimal() +
+    ggplot2::geom_line() +
+    ggplot2::labs(title = wwtp_names[i], x = "Date", y = "Log10 Copies/L-WW", color = "") +
+    ggplot2::geom_point(aes(x = dates, y = ts_matrix[, i])) +
+    ggplot2::labs(color = "") +
+    ggplot2::scale_shape_manual(values = c(8, 19))
+})
+ts_plots <- ts_plots[-c(15, 16, 25, 26)]
+```
+
+
+5. Fitting the MARSS model
+    -   Using the `MARSS` package, we fit a MARSS model to the synthetic data.
+    -  The model is specified using the `model.spec` list.
+    -  The `MARSS` function is used to fit the model to the data.
+    -  The `MARSSkfas` function is used to obtain the filter and smoother estimates.
+    -  The filter and smoother estimates are stored in the `kfas_results` object.
+    -  The filter and smoother estimates are extracted from the `kfas_results` object.
+    -  The variances for the filter and smoother estimates are extracted from the `kfas_results` object.
+    -  The variances are converted to the right format for the confidence intervals.
+    -  The level shift is extracted from the model and combined with the filter and smoother estimates.
+    -  The filter and smoother estimates are stored in the `fits_list` object.
+
+
+```{r}
+#| warning: false
+#| message: false
+#| cache: true
+#| output: false
+#| code-fold: true
+#| label: Fit Model
+
+num_obs <- length(wwtp_names)
+num_states <- 2
+# Especificar el modelo
+model.spec <- list()
+model.spec$B <- matrix(c(2, 1, -1, 0), nrow = num_states)
+model.spec$U <- "zero"
+model.spec$G <- matrix(c(1, 0, 0, 0), nrow = num_states)
+model.spec$Q <- "diagonal and equal"
+model.spec$Z <- matrix(0, nrow = num_obs, ncol = num_states)
+model.spec$Z[, 1] <- 1
+model.spec$V0 <- "identity"
+model.spec$x0 <- "equal"
+A <- function(n) {
+  A <- matrix(list(0), n, 1)
+  for (i in 2:n) {
+    A[i, 1] <- paste0("a", i)
+  }
+  return(A)
+}
+model.spec$A <- A(num_obs)
+model.spec$R <- "diagonal and unequal"
+
+# Ajustar el modelo MARSS a los datos reales
+fit <- MARSS(t(ts_matrix), model = model.spec, method = "BFGS", fit = TRUE, fun.kf = "MARSSkfas")
+
+# Apply MARSSkf to obtatin the filter and smoother estimates
+kfas_results <- MARSS::MARSSkfas(fit)
+  
+# Estimaciones filtradas (filter estimates)
+filter_estimates <- kfas_results$xtt
+  
+# Estimaciones suavizadas (smoother estimates)
+smoother_estimates <- kfas_results$xtT
+  
+# Obtener varianzas para los intervalos de confianza
+filter_var <- kfas_results$Vtt
+smoother_var <- kfas_results$VtT
+  
+# Make sure the variances are in the right format
+filter_var <- sapply(1:dim(filter_var)[3], function(t) diag(filter_var[,,t])[1])
+smoother_var <- sapply(1:dim(smoother_var)[3], function(t) diag(smoother_var[,,t])[1])
+  
+fits_list <- list()
+  
+# Level Shift 
+level_shift <- function(A, A_est) {
+   # Convertimos A a un vector de caracteres para manejar valores mixtos
+    A <- as.character(A)
+    # Inicializamos un índice para A_est
+    est_index <- 1
+    
+    # Creamos un vector para almacenar los parámetros combinados
+    A_combined <- numeric(length(A))
+    
+    # Recorremos A y reemplazamos los placeholders con los valores estimados
+    for (i in seq_along(A)) {
+      if (A[i] != "" && !is.na(as.numeric(A[i]))) {
+        # Si es un valor fijo, lo dejamos tal cual
+        A_combined[i] <- as.numeric(A[i])
+      } else {
+        # Si es un placeholder, lo reemplazamos con el valor de A_est
+        A_combined[i] <- A_est[est_index]
+        est_index <- est_index + 1
+      }
+    }
+    
+    return(as.data.frame(A_combined))
+  }
+  
+  A_new           <- level_shift(model.spec$A, fit$par$A)
+  A_new           <- t(A_new)
+  colnames(A_new) <- wwtp_names
+  A_new           <- as.data.frame(A_new)
+  
+  
+  for (i in 1:length(wwtp_names)) {
+    ww_name <- wwtp_names[i]
+    obs     <- ts_matrix[, i]
+    ts_missing <- is.na(obs)
+
+    smoothers <- data.frame(
+      date = dates,
+      est  = smoother_estimates[1,] + A_new[1, i],
+      lwr  = (smoother_estimates[1,]) - 1.96 * sqrt(smoother_var) + A_new[1, i],
+      upr  = (smoother_estimates[1,]) + 1.96 * sqrt(smoother_var) + A_new[1, i],
+      name = ww_name,
+      fit  = rep("smoother", length(dates)),
+      obs  = obs,
+      ts_missing = ts_missing,
+      sigv = rep(fit$par$R[i], length(dates)),
+      sigw = rep(fit$par$Q[1], length(dates))
+    )
+    
+    filters <- data.frame(
+      date = dates,
+      est  = filter_estimates[1,] + A_new[1, i],
+      lwr  = (filter_estimates[1,]) - 1.96 * sqrt(filter_var) + A_new[1, i],
+      upr  = (filter_estimates[1,]) + 1.96 * sqrt(filter_var) + A_new[1, i],
+      name = ww_name,
+      fit  = rep("filter", length(dates)),
+      obs  = obs,
+      ts_missing = ts_missing,
+      sigv = rep(fit$par$R[i], length(dates)),
+      sigw = rep(fit$par$Q[1], length(dates))
+    )
+    
+    fits_list[[ww_name]] <- bind_rows(smoothers, filters)
+  }
+```
+
+
+6. Population vs Variance vs Level Shift 
+    -   The `left_join` function is used to combine the filter and smoother estimates with the population data.
+    -   The `select` function is used to select the columns to display in the table.
+    -   The `distinct` function is used to remove duplicate rows.
+    -   The `arrange` function is used to order the rows in descending order of population.
+    -   The `rename` function is used to change the column names.
+    -   The `kable` function is used to create a table with the values of R and the level shift.
+    -   The `kable_styling` function is used to style the table.
+
+
+```{r}
+#| warning: false
+#| echo: false
+#| message: false
+#| code-fold: true
+#| label: Population vs Variance vs Level Shift
+#| output: true
+
+
+# First create a table with the level shift
+# Set A_new as a data frame and combined with wwtp_names (wwtp_names must be another column)
+A_new <- as.data.frame(t(A_new))
+A_new$WWTP <- wwtp_names
+#remove the index
+rownames(A_new) <- NULL
+# Rename A_combined
+colnames(A_new) <- c("Level Shift", "WWTP")
+
+# Análisis del estimado de R y del Level Shift en función de la población tabla
+# Crear una tabla con los valores de R y el Level Shift
+R_level_shift <- data.frame(
+  WWTP = wwtp_names,
+  R = fit$par$R[1:length(wwtp_names)],
+  A = as.numeric(A_new$`Level Shift`)
+)
+
+left_join(R_level_shift, case_wwtp_ag, by = c("WWTP" = "WWTP")) %>%
+  # Move the Population column after WWTP
+    select(WWTP, pop, R, A) %>%
+  # Unique WWTPs
+  distinct() %>%
+  # Order in descending order of population
+  arrange(desc(pop)) %>%
+  # Change the column names
+  rename("Population" = pop, "Variance" = R, "Level Shift" = A) %>%
+  kable("html") %>%
+  kable_styling("striped", full_width = F)
+```
+
+
+7.  Filter Plots
+    -   The `bind_rows` function is used to combine the filter and smoother estimates.
+    -   The `filter` function is used to select the filter estimates.
+    -   The `group_nest` function is used to group the data by WWTP.
+    -   The `deframe` function is used to convert the data to a list.
+    -   The `map` function is used to create a list of filter plots for each WWTP.
+    -   The `fplot` function is used to create the filter plots.
+    -   The `geom_point` function is used to add points to the plot.
+
+
+```{r}
+#| warning: false
+#| message: false
+#| code-fold: true
+#| output: false
+#| error: false
+#| label: MARSS filter-visuals
+
+library(base)
+source("Code/fplot.R")
+
+filter_plots <- fits_list %>% bind_rows() %>% 
+          filter(fit == "filter") %>%
+          group_nest(name, keep = T) %>% 
+          deframe() %>%
+          map(., ~ {
+            plot.dat <- .x
+            plot.dat$name <- factor(plot.dat$name, 
+                                    levels(factor(plot.dat$name))[2:1])
+            fplot(f= plot.dat, title_char =  "Filter Estimates")+ 
+              geom_point(aes(x = date, y = obs))
+          })
+
+filter_plots <- filter_plots[-c(15, 16, 25, 26)]
+```
+
+
+8. Smoother Plots 
+    -   The `bind_rows` function is used to combine the filter and smoother estimates.
+    -   The `filter` function is used to select the smoother estimates.
+    -   The `group_nest` function is used to group the data by WWTP.
+    -   The `deframe` function is used to convert the data to a list.
+    -   The `map` function is used to create a list of smoother plots for each WWTP.
+    -   The `fplot` function is used to create the smoother plots.
+    -   The `geom_point` function is used to add points to the plot.
+
+
+```{r}
+#| warning: false
+#| code-fold: true
+#| message: false
+#| output: false
+#| label: MARSS smoother-visuals
+
+# plotting the smoothers for all the series
+smoother_plots <- fits_list %>% bind_rows() %>%
+          filter(fit == "smoother") %>%
+          group_nest(name, keep = T) %>% 
+          deframe() %>%
+          map(., ~ {
+            plot.dat <- .x
+            plot.dat$name <- factor(plot.dat$name, 
+                                    levels(factor(plot.dat$name))[2:1])
+            fplot(f= plot.dat, title_char =  "Smoother Estimates")+ 
+              geom_point(aes(x = date, y = obs))
+          })
+smoother_plots <- smoother_plots[-c(15, 16, 25, 26)]
+```
+
+
+9. Control Charts 
+    -   The `MARSS_control_charts` function is used to create the control charts.
+    -   The `filter` function is used to select the filter estimates.
+    -   The `left_join` function is used to combine the filter estimates with the smoother estimates.
+    -   The `mutate` function is used to adjust the observations with the estimated intercept.
+    -   The `pull` function is used to extract the observations.
+    -   The `cor` function is used to compute the estimated covariance.
+    -   The `qcc::ewma` function is used to calculate the EWMA.
+    -   The `ggplot2` package is used to create the plot.
+    -   The `geom_vline` function is used to add vertical lines to the plot.
+    -   The `geom_line` function is used to add lines to the plot.
+    -   The `geom_point` function is used to add points to the plot.
+    -   The `scale_color_manual` function is used to set the colors of the points.
+    -   The `new_scale_color` function is used to add a new color scale to the plot.
+    -   The `geom_hline` function is used to add horizontal lines to the plot.
+    -   The `ggtitle`, `xlab`, `ylab`, and `theme_minimal` functions are used to set the title, x-axis label, y-axis label, and theme of the plot.
+
+
+```{r}
+#| warning: false
+#| code-fold: true
+#| message: false
+#| output: true
+#| label: MARSS control-charts
+
+# Function to calculate the EWMA
+MARSS_control_charts <- function(location) {
+  y_t_all <- fits_list[[location]] %>% 
+    filter(fit == "filter" & date > "2021-08-30")
+  
+  mu_t <- fits_list$`69TH STREET` %>% 
+    filter(fit == "filter" & date > "2021-08-30")
+  
+  # Replace missing values in WWTP series
+  y_t_all[y_t_all$ts_missing, "obs"] <- left_join(y_t_all[y_t_all$ts_missing,], 
+                                                  mu_t, by = "date") %>%
+    pull(est.y)
+  
+  # Adjust observations with the estimated intercept
+  y_t_all <- y_t_all %>%
+    mutate(obs = obs) # Adjust observations with the estimated intercept
+  
+  y_t <- y_t_all %>% pull(obs)
+  
+  # Just the online estimates for '69TH STREET'
+  mu_t <- mu_t %>% pull(est)
+  
+  # Compute the raw differences (numerator of d_tilde)
+  diff <- y_t - mu_t
+  
+  # Varianzas de 69TH Street
+  var_y <- fits_list$`69TH STREET` %>%
+    filter(date > "2021-08-30" & fit == "filter") %>%
+    mutate(var_est = sigv^2) %>%
+    pull(var_est)
+  
+  var_mu <- fits_list$`69TH STREET` %>%
+    filter(date > "2021-08-30" & fit == "filter") %>%
+    mutate(var_est = sigw^2) %>%
+    pull(var_est)
+  
+  # Compute the estimated covariance (scaled product of variances)
+  cor_estimate <- cor(y_t, mu_t, use = "pairwise.complete.obs")
+  cov_est <- as.numeric(cor_estimate) * sqrt(var_y) * sqrt(var_mu)
+  
+  # Compute approximate variance using covariance
+  var_est <- var_y + var_mu - 2 * cov_est
+  
+  # Standardize
+  standardized_diff <- diff / sqrt(var_est)
+  
+  # Calculate the EWMA
+  lag1_est <- acf(standardized_diff, plot = FALSE, na.action = na.pass)$acf[2]
+  if (lag1_est < 0) {
+    lag1_est <- 0.3
+  }
+  
+  # Calculate the EWMA
+  ewma_chart <- qcc::ewma(standardized_diff, center = 0, sd = 1, 
+                          lambda = lag1_est, nsigmas = 5, plot = FALSE)
+  
+  
+  # Extract EWMA values and control limits
+  ewma_values <- ewma_chart$y
+  upper_limit <- ewma_chart$limits[, 2]
+  lower_limit <- ewma_chart$limits[, 1]
+  
+   # Create data frame for plotting
+  plot_data <- data.frame(
+    date = y_t_all$date,
+    ewma = ewma_values,
+    upper = upper_limit,
+    lower = lower_limit,
+    standardized_diff = standardized_diff,
+    col = ifelse(ewma_values > upper_limit | ewma_values < lower_limit, "red", "black")
+  )
+  
+  obs_dat <- data.frame(x = plot_data$date, y = ewma_chart$data[, 1], col = "black")
+  
+  # Create the plot
+  p <- ggplot2::ggplot(plot_data, aes(x = date, y = ewma)) +
+    ggplot2::geom_vline(xintercept = NULL,
+               col = "darkgrey",
+               lwd = 1) +
+    ggplot2::geom_line()+
+    ggplot2::geom_point(aes(col = col), size = 3) +
+    ggplot2::scale_color_manual(values = c(1,2), label = c("No", "Yes"), name = "Separation?") +
+    ggnewscale::new_scale_color() +
+    ggplot2::geom_point(data = obs_dat, aes(x = x, y = y, col =col), shape = 3) +
+    ggplot2::scale_color_manual(values = "black", label = "Observed \nStandardized \nDifference", name = "") +
+    ggplot2::geom_hline(aes(yintercept = 0), lty = 1) +
+    # Add control limits
+    ggplot2::geom_hline(yintercept = mean(plot_data$upper), color = "black", linetype = "dashed", lty = 2) +
+    ggplot2::geom_hline(yintercept = mean(plot_data$lower), color = "black", linetype = "dashed", lty = 2) +
+    ggtitle(location, " - Common State Filter")+
+    ggplot2::xlab("Date") + ggplot2::ylab("Standardized Difference in Series") +
+    ggplot2::theme_minimal()
+  return(p)
+}
+
+# Generate control charts for each WWTP
+control_list <- lapply(wwtp_names, function(x) { 
+  MARSS_control_charts(location = x)
+})
+
+# Name the control_list
+names(control_list) <- wwtp_names
+
+control_list <- control_list[-c(15, 16, 25, 26)]
+```
+
+
+10.  Interactive map with clickable points displaying graphs
+    -   The `mapview` function is used to create an interactive map with clickable points.
+    -   The `popupGraph` function is used to display the time series plot when a point is clicked.
+    -   The `popup` argument is set to `popupGraph` to display the time series plot.
+    -   The `width` and `height` arguments are used to set the size of the popup.
+    -   The `zcol` argument is used to set the column to display in the popup.
+    -   The `legend` argument is set to `FALSE` to hide the legend.
+    -   The `filter` function is used to remove specific indices from the list of plots.
+    -   The `mapview` function is used to create the interactive map with clickable points displaying the time series plots.
+
+
+```{r}
+#| warning: false
+#| label: Interactive-Map
+#| code-fold: true
+#| message: false
+#| cache: true 
+
+combined_plot <- list()
+# Create the combined plot
+for (i in 1:length(ts_plots)) {
+  combined_plot[[i]] <- cowplot::plot_grid(ts_plots[[i]], control_list[[i]], filter_plots[[i]], smoother_plots[[i]],  ncol = 2, nrow = 2)
+}
+# Omit Sims Bayou, Sims Bayou North, Sims Bayou South, Kingwood Central, and Kingwood West
+mapview(wwtp_shp, zcol = "Name", legend = FALSE, 
+        popup = popupGraph(combined_plot, width = 800, height = 600))
+```
+
+
+11.  Movie Map 
+    - The `rbind` function is used to combine the data for the different WWTPs.
+    - The `group_by` function is used to group the data by date.
+    - The `summarise` function is used to calculate the mean estimate for each date.
+    - The `mutate` function is used to add a new column with the WWTP name.
+    - The `filter` function is used to select the data for specific WWTPs.
+    - The `geom_sf` function is used to create the map.
+    - The `geom_sf_text` function is used to add labels to the map.
+    - The `theme_map` function is used to set the theme of the map.
+    - The `theme` function is used to set the position of the legend.
+    - The `transition_time` function is used to create the animation.
+    - The `ease_aes` function is used to set the easing function.
+    - The `animate` function is used to create the animation.
+    - The `av_renderer` function is used to set the renderer for the animation to MP4 format.
+    - The `width` and `height` arguments are used to set the size of the animation.
+    - The `anim_save` function is used to save the animation as a GIF (if you choose to save it as a GIF instead of MP4).
+
+
+```{r}
+#| echo: true
+#| code-fold: true
+#| cache: true
+#| animation.hook: gifski
+#| label: Movie-Map
+
+# Combine data from different WWTPs into a single dataframe
+data_est_date <- data.frame()
+
+for (nombre_planta in wwtp_names) {
+  Fit_est_date <- fits_list[[nombre_planta]][c(1,2)]
+  Fit_est_date$Name <- nombre_planta
+  data_est_date <- rbind(data_est_date, Fit_est_date)
+}
+
+# Calculate mean estimates and rename specific WWTPs
+SIMS_BAYOU_data <- data_est_date %>% 
+  filter(Name %in% c("SIMS BAYOU NORTH", "SIMS BAYOU SOUTH")) %>%
+  group_by(date) %>%
+  summarise(est = mean(est), .groups = 'drop') %>%
+  mutate(Name = "SIMS BAYOU")
+
+KINGWOOD_data <- data_est_date %>% 
+  filter(Name %in% c("KINGWOOD CENTRAL", "KINGWOOD WEST")) %>%
+  group_by(date) %>%
+  summarise(est = mean(est), .groups = 'drop') %>%
+  mutate(Name = "KINGWOOD")
+
+# Repeat for other specific WWTPs
+MUD203_data <- data_est_date %>% 
+  filter(Name %in% c("MUD#203")) %>%
+  mutate(Name = "MUD #203")
+
+WCID76_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#76")) %>%
+  mutate(Name = "WCID #76")
+
+FWSD23_data <- data_est_date %>% 
+  filter(Name %in% c("FWSD#23")) %>%
+  mutate(Name = "FWSD #23")
+
+INTERCONTINENTAL_data <- data_est_date %>% 
+  filter(Name %in% c("INTERCONTINENTAL AIRPORT")) %>%
+  mutate(Name = "INTERCONTINENTAL")
+
+WCID111_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#111")) %>%
+  mutate(Name = "WCID #111")
+
+WCID47_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#47")) %>%
+  mutate(Name = "WCID #47")
+
+# Combine all the processed WWTP data back into the main dataframe
+data_est_date <- rbind(data_est_date, SIMS_BAYOU_data, KINGWOOD_data, 
+                       INTERCONTINENTAL_data, MUD203_data, WCID76_data, 
+                       FWSD23_data, WCID111_data, WCID47_data)
+
+# Filter out the original individual WWTPs to avoid duplication
+data_est_date <- data_est_date %>% 
+  filter(Name != "SIMS BAYOU NORTH" & Name != "SIMS BAYOU SOUTH" & 
+         Name != "KINGWOOD CENTRAL" & Name != "KINGWOOD WEST" & 
+         Name != "INTERCONTINENTAL AIRPORT" & Name != "MUD#203" & 
+         Name != "WCID#76" & Name != "FWSD#23" & 
+         Name != "WCID#111" & Name != "WCID#47")
+
+# Merge with spatial data and convert to sf object
+data_final <- merge(data_est_date, wwtp_shp, by = "Name")
+data_final_sf <- st_as_sf(data_final)
+
+# Create the animated map using ggplot2 and gganimate
+p <- ggplot(data_final_sf) +
+  geom_sf(aes(fill = est), color = "white", size = 0.5) + 
+  scale_fill_viridis_c(option = "C", name = "Viral Load") + 
+  theme_minimal() +
+  labs(title = 'Date: {frame_time}', x = '', y = '') + 
+  transition_time(date) + 
+  ease_aes('linear') +
+  theme_map() +
+  geom_sf_text(data = wwtp_shp, aes(label = Name, geometry = geometry),
+               size = 8, 
+               check_overlap = TRUE, 
+               family = "sans", 
+               fun.geometry = sf::st_centroid) +
+  theme(legend.position = "top",
+        legend.justification = "right", 
+        legend.key.size = unit(2, "cm"),
+        legend.title = element_text(size = 30),
+        legend.text = element_text(size = 20), 
+        plot.title = element_text(size = 30), 
+        axis.title.x = element_text(size = 30), 
+        axis.title.y = element_text(size = 30))
+
+# Save the animation as a GIF 
+# anim_save(animation = p, filename = "images/vloadmap.gif", 
+#           width = 2000, height = 2000)
+
+# Save the animation as an mp4 video
+animate(p, nframes=100, fps=10, renderer=av_renderer("images/vloadmap.mp4"), 
+        width = 2000, height = 2000)
+```
+
+
+
+<video width="800" controls>
+  <source src="images/vloadmap.mp4" type="video/mp4">
+</video>
+
+
+12. Update the time series plots with new data points. Each week, a report is sent where each time series plot has one new observation
+    -   This run by just reading in a new data file and updating the existing data with new observations.
+    -   The new data is simulated for the current week by adding random noise to the existing data.
+    -   The new data only contains the new observations for the current week at each WWTP.
+
+
+```{r}
+#| warning: false
+#| echo: true
+#| message: false
+#| code-fold: true
+#| label: Updated-time-series-plots
+
+
+# Change the synthetic data format to date, log10copies, and WWTP
+existing_data <- synthetic_data %>% 
+  pivot_longer(cols = -date, names_to = "WWTP", values_to = "log10cpl") 
+
+
+# Simulate new data for the current week
+new_data <- existing_data %>%
+  dplyr::filter(date == max(date)) %>%
+  dplyr::mutate(date = date + 7,  # Simulate next week's data
+         log10cpl = log10cpl + rnorm(n(), 0, 0.1))
+
+# Function to update the existing data with new observations
+update_data <- function(existing_data, new_data) {
+  updated_data <- base::rbind(existing_data, new_data)
+  return(updated_data)
+}
+
+# Update the data
+all_ts_observed <- update_data(existing_data, new_data)
+
+# Function to create time series plots with new data points highlighted in red
+
+updated_ts_plot <- function(data, new_data) {
+  ggplot2::ggplot(data, aes(x = date, y = log10cpl)) +
+    ggplot2::theme_minimal() +
+    ggplot2::geom_line() +
+    ggplot2::labs(title = unique(data$WWTP), x = "Date", y = "Log10 Copies/L-WW", color = "") +
+    ggplot2::geom_point(aes(x = date, y = log10cpl)) +
+    ggplot2::geom_point(data = new_data, aes(x = date, y = log10cpl), color = "red", size = 3) +
+    ggplot2::labs(color = "") +
+    ggplot2::scale_shape_manual(values = c(8, 19))
+}
+
+# Generate the plots with highlighted new points
+up_ts_plots <- all_ts_observed %>%
+  dplyr::group_nest(WWTP, keep = TRUE) %>%
+  tibble::deframe() %>%
+  purrr::map(., ~ {
+    new_data_point <- new_data %>% 
+      dplyr::filter(WWTP == .x$WWTP[1])
+    updated_ts_plot(.x, new_data_point)
+  })
+# Remove specific indices if necessary (15, 16, 25, 26)
+up_ts_plots <- up_ts_plots[-c(15, 16, 25, 26)]
+```
+
+```{r}
+#| warning: false
+#| echo: false
+#| message: false
+#| cache: true
+#| code-fold: true
+#| label: Updated-filter-plots-output
+
+# Change the updated data to matrix format
+updated_data <- all_ts_observed %>% 
+  pivot_wider(names_from = WWTP, values_from = log10cpl) %>% 
+  select(-date)
+
+updated_fit <- MARSS(t(updated_data), model = model.spec, method = "BFGS", fit = TRUE, fun.kf = "MARSSkfas")
+
+# Apply MARSSkf to obtatin the filter and smoother estimates
+kfas_results <- MARSS::MARSSkfas(updated_fit)
+  
+# Estimaciones filtradas (filter estimates)
+filter_estimates <- kfas_results$xtt
+  
+# Estimaciones suavizadas (smoother estimates)
+smoother_estimates <- kfas_results$xtT
+  
+# Obtener varianzas para los intervalos de confianza
+filter_var <- kfas_results$Vtt
+smoother_var <- kfas_results$VtT
+  
+# Make sure the variances are in the right format
+filter_var <- sapply(1:dim(filter_var)[3], function(t) diag(filter_var[,,t])[1])
+smoother_var <- sapply(1:dim(smoother_var)[3], function(t) diag(smoother_var[,,t])[1])
+  
+fits_list <- list()
+  
+# Level Shift 
+level_shift <- function(A, A_est) {
+   # Convertimos A a un vector de caracteres para manejar valores mixtos
+    A <- as.character(A)
+    # Inicializamos un índice para A_est
+    est_index <- 1
+    
+    # Creamos un vector para almacenar los parámetros combinados
+    A_combined <- numeric(length(A))
+    
+    # Recorremos A y reemplazamos los placeholders con los valores estimados
+    for (i in seq_along(A)) {
+      if (A[i] != "" && !is.na(as.numeric(A[i]))) {
+        # Si es un valor fijo, lo dejamos tal cual
+        A_combined[i] <- as.numeric(A[i])
+      } else {
+        # Si es un placeholder, lo reemplazamos con el valor de A_est
+        A_combined[i] <- A_est[est_index]
+        est_index <- est_index + 1
+      }
+    }
+    
+    return(as.data.frame(A_combined))
+  }
+  
+  A_new           <- level_shift(model.spec$A, updated_fit$par$A)
+  A_new           <- t(A_new)
+  colnames(A_new) <- wwtp_names
+  A_new           <- as.data.frame(A_new)
+  
+  
+  for (i in 1:length(wwtp_names)) {
+    ww_name <- wwtp_names[i]
+    obs     <- as.matrix(updated_data)[, i]
+    ts_missing <- is.na(obs)
+
+    smoothers <- data.frame(
+      date = unique(all_ts_observed$date),
+      est  = smoother_estimates[1,] + A_new[1, i],
+      lwr  = (smoother_estimates[1,]) - 1.96 * sqrt(smoother_var) + A_new[1, i],
+      upr  = (smoother_estimates[1,]) + 1.96 * sqrt(smoother_var) + A_new[1, i],
+      name = ww_name,
+      fit  = rep("smoother", length(all_ts_observed$date)),
+      obs  = obs,
+      ts_missing = ts_missing,
+      sigv = rep(updated_fit$par$R[i], length(unique(all_ts_observed$date))),
+      sigw = rep(updated_fit$par$Q[1], length(unique(all_ts_observed$date)))
+    )
+    
+    filters <- data.frame(
+      date = unique(all_ts_observed$date),
+      est  = filter_estimates[1,] + A_new[1, i],
+      lwr  = (filter_estimates[1,]) - 1.96 * sqrt(filter_var) + A_new[1, i],
+      upr  = (filter_estimates[1,]) + 1.96 * sqrt(filter_var) + A_new[1, i],
+      name = ww_name,
+      fit  = rep("filter", length(unique(all_ts_observed$date))),
+      obs  = obs,
+      ts_missing = ts_missing,
+      sigv = rep(updated_fit$par$R[i], length(unique(all_ts_observed$date))),
+      sigw = rep(updated_fit$par$Q[1], length(unique(all_ts_observed$date)))
+    )
+    
+    fits_list[[ww_name]] <- bind_rows(smoothers, filters)
+  }
+
+# Create the updated filter plots
+updated_filter_plots <- fits_list %>% bind_rows() %>% 
+          filter(fit == "filter") %>%
+          group_nest(name, keep = T) %>% 
+          deframe() %>%
+          map(., ~ {
+            plot.dat <- .x
+            plot.dat$name <- factor(plot.dat$name, 
+                                    levels(factor(plot.dat$name))[2:1])
+            fplot(f= plot.dat, title_char =  "Filter Estimates")+ 
+              geom_point(aes(x = date, y = obs))
+          })
+
+updated_filter_plots <- updated_filter_plots[-c(15, 16, 25, 26)]
+
+# Create the updated smoother plots
+updated_smoother_plots <- fits_list %>% bind_rows() %>%
+  filter(fit == "smoother") %>%
+  group_nest(name, keep = T) %>% 
+  deframe() %>%
+  map(., ~ {
+    plot.dat <- .x
+    plot.dat$name <- factor(plot.dat$name, 
+                            levels(factor(plot.dat$name))[2:1])
+    fplot(f= plot.dat, title_char =  "Smoother Estimates")+ 
+      geom_point(aes(x = date, y = obs))
+  })
+
+updated_smoother_plots <- updated_smoother_plots[-c(15, 16, 25, 26)]
+
+# Change the fit_list inside the function MARSS_control_charts function to the updated_fits_list
+updated_MARSS_control_charts <- function(location) {
+  y_t_all <- fits_list[[location]] %>% 
+    filter(fit == "filter" & date > "2021-08-30")
+  
+  mu_t <- fits_list$`69TH STREET` %>% 
+    filter(fit == "filter" & date > "2021-08-30")
+  
+  # Replace missing values in WWTP series
+  y_t_all[y_t_all$ts_missing, "obs"] <- left_join(y_t_all[y_t_all$ts_missing,], 
+                                                  mu_t, by = "date") %>%
+    pull(est.y)
+  
+  # Adjust observations with the estimated intercept
+  y_t_all <- y_t_all %>%
+    mutate(obs = obs) # Adjust observations with the estimated intercept
+  
+  y_t <- y_t_all %>% pull(obs)
+  
+  # Just the online estimates for '69TH STREET'
+  mu_t <- mu_t %>% pull(est)
+  
+  # Compute the raw differences (numerator of d_tilde)
+  diff <- y_t - mu_t
+  
+  # Varianzas de 69TH Street
+  var_y <- fits_list$`69TH STREET` %>%
+    filter(date > "2021-08-30" & fit == "filter") %>%
+    mutate(var_est = sigv^2) %>%
+    pull(var_est)
+  
+  var_mu <- fits_list$`69TH STREET` %>%
+    filter(date > "2021-08-30" & fit == "filter") %>%
+    mutate(var_est = sigw^2) %>%
+    pull(var_est)
+  
+  # Compute the estimated covariance (scaled product of variances)
+  cor_estimate <- cor(y_t, mu_t, use = "pairwise.complete.obs")
+  cov_est <- as.numeric(cor_estimate) * sqrt(var_y) * sqrt(var_mu)
+  
+  # Compute approximate variance using covariance
+  var_est <- var_y + var_mu - 2 * cov_est
+  
+  # Standardize
+  standardized_diff <- diff / sqrt(var_est)
+  
+  # Calculate the EWMA
+  lag1_est <- acf(standardized_diff, plot = FALSE, na.action = na.pass)$acf[2]
+  if (lag1_est < 0) {
+    lag1_est <- 0.3
+  }
+  
+  # Calculate the EWMA
+  ewma_chart <- qcc::ewma(standardized_diff, center = 0, sd = 1, 
+                          lambda = lag1_est, nsigmas = 5, plot = FALSE)
+  
+  
+  # Extract EWMA values and control limits
+  ewma_values <- ewma_chart$y
+  upper_limit <- ewma_chart$limits[, 2]
+  lower_limit <- ewma_chart$limits[, 1]
+  
+   # Create data frame for plotting
+  plot_data <- data.frame(
+    date = y_t_all$date,
+    ewma = ewma_values,
+    upper = upper_limit,
+    lower = lower_limit,
+    standardized_diff = standardized_diff,
+    col = ifelse(ewma_values > upper_limit | ewma_values < lower_limit, "red", "black")
+  )
+  
+  obs_dat <- data.frame(x = plot_data$date, y = ewma_chart$data[, 1], col = "black")
+  
+  # Create the plot
+  p <- ggplot2::ggplot(plot_data, aes(x = date, y = ewma)) +
+    ggplot2::geom_vline(xintercept = NULL,
+               col = "darkgrey",
+               lwd = 1) +
+    ggplot2::geom_line()+
+    ggplot2::geom_point(aes(col = col), size = 3) +
+    ggplot2::scale_color_manual(values = c(1,2), label = c("No", "Yes"), name = "Separation?") +
+    ggnewscale::new_scale_color() +
+    ggplot2::geom_point(data = obs_dat, aes(x = x, y = y, col =col), shape = 3) +
+    ggplot2::scale_color_manual(values = "black", label = "Observed \nStandardized \nDifference", name = "") +
+    ggplot2::geom_hline(aes(yintercept = 0), lty = 1) +
+    # Add control limits
+    ggplot2::geom_hline(yintercept = mean(plot_data$upper), color = "black", linetype = "dashed", lty = 2) +
+    ggplot2::geom_hline(yintercept = mean(plot_data$lower), color = "black", linetype = "dashed", lty = 2) +
+    ggtitle(location, " - Common State Filter")+
+    ggplot2::xlab("Date") + ggplot2::ylab("Standardized Difference in Series") +
+    ggplot2::theme_minimal()
+  return(p)
+}
+
+# Create the updated control charts
+updated_control_list <- lapply(wwtp_names, function(x) { 
+  updated_MARSS_control_charts(location = x)
+})
+
+# Name the control_list
+names(updated_control_list) <- wwtp_names
+
+updated_control_list <- updated_control_list[-c(15, 16, 25, 26)]
+```
+
+```{r}
+#| warning: false
+#| echo: false
+#| message: false
+#| code-fold: true
+#| label: Updated-Interactive-Map
+#| cache: true
+# updated combined plots
+updated_combined_plot <- list()
+# Create the updated combined plot
+for (i in 1:length(ts_plots)) {
+  updated_combined_plot[[i]] <- cowplot::plot_grid(up_ts_plots[[i]], updated_control_list[[i]], updated_filter_plots[[i]], updated_smoother_plots[[i]],  ncol = 2, nrow = 2)
+}
+
+# Omit Sims Bayou, Sims Bayou North, Sims Bayou South, Kingwood Central, and Kingwood West
+mapview(wwtp_shp, zcol = "Name", legend = FALSE, 
+        popup = popupGraph(updated_combined_plot, width = 800, height = 600))
+```
+
+```{r}
+#| warning: false
+#| echo: false
+#| message: false
+#| cache: true
+#| code-fold: true
+#| label: Updated-Movie-Map
+
+
+# Combine data from different WWTPs into a single dataframe
+data_est_date <- data.frame()
+
+for (nombre_planta in wwtp_names) {
+  Fit_est_date <- fits_list[[nombre_planta]][c(1,2)]
+  Fit_est_date$Name <- nombre_planta
+  data_est_date <- rbind(data_est_date, Fit_est_date)
+}
+
+# Calculate mean estimates and rename specific WWTPs
+SIMS_BAYOU_data <- data_est_date %>% 
+  filter(Name %in% c("SIMS BAYOU NORTH", "SIMS BAYOU SOUTH")) %>%
+  group_by(date) %>%
+  summarise(est = mean(est), .groups = 'drop') %>%
+  mutate(Name = "SIMS BAYOU")
+
+KINGWOOD_data <- data_est_date %>% 
+  filter(Name %in% c("KINGWOOD CENTRAL", "KINGWOOD WEST")) %>%
+  group_by(date) %>%
+  summarise(est = mean(est), .groups = 'drop') %>%
+  mutate(Name = "KINGWOOD")
+
+# Repeat for other specific WWTPs
+MUD203_data <- data_est_date %>% 
+  filter(Name %in% c("MUD#203")) %>%
+  mutate(Name = "MUD #203")
+
+WCID76_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#76")) %>%
+  mutate(Name = "WCID #76")
+
+FWSD23_data <- data_est_date %>% 
+  filter(Name %in% c("FWSD#23")) %>%
+  mutate(Name = "FWSD #23")
+
+INTERCONTINENTAL_data <- data_est_date %>% 
+  filter(Name %in% c("INTERCONTINENTAL AIRPORT")) %>%
+  mutate(Name = "INTERCONTINENTAL")
+
+WCID111_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#111")) %>%
+  mutate(Name = "WCID #111")
+
+WCID47_data <- data_est_date %>% 
+  filter(Name %in% c("WCID#47")) %>%
+  mutate(Name = "WCID #47")
+
+# Combine all the processed WWTP data back into the main dataframe
+data_est_date <- rbind(data_est_date, SIMS_BAYOU_data, KINGWOOD_data, 
+                       INTERCONTINENTAL_data, MUD203_data, WCID76_data, 
+                       FWSD23_data, WCID111_data, WCID47_data)
+
+# Filter out the original individual WWTPs to avoid duplication
+data_est_date <- data_est_date %>% 
+  filter(Name != "SIMS BAYOU NORTH" & Name != "SIMS BAYOU SOUTH" & 
+         Name != "KINGWOOD CENTRAL" & Name != "KINGWOOD WEST" & 
+         Name != "INTERCONTINENTAL AIRPORT" & Name != "MUD#203" & 
+         Name != "WCID#76" & Name != "FWSD#23" & 
+         Name != "WCID#111" & Name != "WCID#47")
+
+# Merge with spatial data and convert to sf object
+data_final <- merge(data_est_date, wwtp_shp, by = "Name")
+data_final_sf <- st_as_sf(data_final)
+
+# Create the animated map using ggplot2 and gganimate
+p <- ggplot(data_final_sf) +
+  geom_sf(aes(fill = est), color = "white", size = 0.5) + 
+  scale_fill_viridis_c(option = "C", name = "Viral Load") + 
+  theme_minimal() +
+  labs(title = 'Date: {frame_time}', x = '', y = '') + 
+  transition_time(date) + 
+  ease_aes('linear') +
+  theme_map() +
+  geom_sf_text(data = wwtp_shp, aes(label = Name, geometry = geometry),
+               size = 8, 
+               #color letters
+               color = "green",
+               check_overlap = TRUE, 
+               family = "sans", 
+               fun.geometry = sf::st_centroid) +
+  theme(legend.position = "top",
+        legend.justification = "right", 
+        legend.key.size = unit(2, "cm"),
+        legend.title = element_text(size = 30),
+        legend.text = element_text(size = 20), 
+        plot.title = element_text(size = 30), 
+        axis.title.x = element_text(size = 30), 
+        axis.title.y = element_text(size = 30))
+
+# Save the animation as a GIF 
+# anim_save(animation = p, filename = "images/vloadmap.gif", 
+#           width = 2000, height = 2000)
+
+# Save the animation as an mp4 video
+animate(p, nframes=100, fps=10, renderer=av_renderer("images/vloadmap.mp4"), 
+        width = 2000, height = 2000)
+```

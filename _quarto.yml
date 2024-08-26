@@ -20,7 +20,7 @@ book:
       chapters:
         - href: Tabs.qmd
           text: Clickable Tabs
-        - href: ClickableMap.qmd
+        - href: InterMovieMap.qmd
           text: "DRAFT Clickable Maps?"
     - part: Project Management
       chapters:
