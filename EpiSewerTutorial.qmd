@@ -1,0 +1,345 @@
+---
+title: "EpiSewer Review"
+format: html
+editor: visual
+---
+
+## Libraries
+
+```{r}
+library(MARSS)
+library(tidyverse)
+library(KFAS)
+library(ggplot2)
+library(astsa)
+library(dplyr)
+library(data.table)
+library(tseries)
+library(knitr)
+library(latexpdf)
+library(kableExtra)
+library(forecast)
+library(qcc)
+library(ggnewscale)
+library(remotes)
+library(EpiSewer)
+```
+
+## Description of the data
+
+The data consists of time series observations of SARS-CoV-2 concentrations in wastewater samples collected from various wastewater treatment plants (WWTPs) in Houston, Texas, USA. The data includes the date of collection, the WWTP from which the sample was collected, the log10-transformed concentration of SARS-CoV-2 RNA copies per liter (log10cpl), and other relevant information.
+
+The goal is to analyze the data using the EpiSewer package to estimate the dynamics of the SARS-CoV-2 outbreak in Houston based on the wastewater surveillance data.
+
+The cases data is not available, so we will initialize an empty column for cases in the data.
+
+```{r}
+# Load the data and relevant files
+load("Data/all_ts_observed_2023_05_29")
+load("Data/case_wwtp_ag")
+source("Code/fplot.R")
+
+# Process the case data
+case_wwtp_ag <- data.frame("WWTP" = case_wwtp_ag$WWTP, 
+                           "Population" = case_wwtp_ag$pop)
+case_wwtp_ag <- unique(case_wwtp_ag)
+
+# Filter out "SIMS BAYOU" from the observed data
+all_ts_observed <- all_ts_observed %>% 
+  dplyr::filter(WWTP != "SIMS BAYOU") 
+
+## DEFINE PARAMETERS:
+burnin <- 15  # Interesting Variance behavior 
+date_burnin <- all_ts_observed %>% 
+  dplyr::filter(WWTP == '69TH STREET') %>% 
+  dplyr::select(date) %>% 
+  nth(burnin) %>%
+  pull(date)
+
+# Filter the time series data post-burnin and arrange by date
+ts_data <- all_ts_observed %>%
+  dplyr::filter(date > date_burnin) %>%
+  arrange(date)
+
+# Focus on specific WWTPs
+WWTP_focus <- c("69TH STREET")
+
+ts_data <- ts_data %>%
+  dplyr::filter(WWTP %in% WWTP_focus)
+
+# Add constant flow per plant (250 million gallons of wastewater daily for each WWTP)
+constant_flow <- 250e6
+# Change to L/day
+constant_flow <- constant_flow * 3.78541e3
+
+# Add a new column for the flow data to ts_data L/day
+error_sd <- 0.05  # 5% standard deviation for normal distribution
+error_range <- 0.1  # 10% variation for uniform distribution
+ts_data <- ts_data %>%
+  mutate(flow = constant_flow )#+ rnorm(n = nrow(ts_data), mean = 0, sd = error_sd * constant_flow))
+
+# Change the concentration to from log10 to linear 
+ts_data$log10cpl <- 10^ts_data$log10cpl
+# Change names to concentration
+ts_data <- ts_data %>%
+  mutate(concentration = log10cpl) %>%
+  dplyr::select(-log10cpl)
+# Change the water flow by transforming to log 10
+#ts_data$flow <- log10(ts_data$flow)
+
+# Process the dates for the time series
+dates <- ts_data %>%
+  dplyr::select(date, WWTP, concentration) %>%
+  pivot_wider(names_from = WWTP, values_from = concentration) %>%
+  dplyr::select(date) %>%
+  distinct() %>%
+  pull() %>%
+  as.Date() 
+
+# Create the time series matrix
+ts_matrix <- ts_data %>%
+  dplyr::select(date, WWTP, concentration) %>%
+  pivot_wider(names_from = WWTP, values_from = concentration) %>%
+  dplyr::select(-date) %>%
+  as.matrix()
+
+# Extract WWTP names
+wwtp_names <- colnames(ts_matrix)
+
+# Now the ts_data dataframe includes the constant flow for each WWTP
+print(ts_data)
+
+```
+
+Si cambias la media de la distribución gamma de 3 a 2 días y el rango máximo de 12 a 7 días, la desviación estándar se verá afectada. Reducir la media significa que los tiempos de generación entre infecciones serán más cortos, lo que tiende a reducir la dispersión en los datos. Además, acortar el rango máximo a 7 días restringe la cola de la distribución, lo que también contribuye a disminuir la variabilidad general.
+
+Cada parámetro de la distribución gamma tiene un significado importante:\
+- Mean: Es el valor promedio de la distribución, que en este caso representa el tiempo promedio entre una infección y el momento en que una persona infectada comienza a contagiar a otros.\
+- Standard Deviation: Representa la dispersión o variabilidad en los tiempos de generación, mostrando qué tan diferentes pueden ser los tiempos entre infecciones.\
+- Max Range: El límite superior de los tiempos de generación, que acota el valor máximo posible, restringiendo los tiempos más largos.
+
+Si ajustas la distribución de excreción viral (shedding) para cambiar el parámetro de forma o escala, la cantidad de virus excretado en el tiempo y la variabilidad entre individuos también cambiarán. Reducir el rango máximo de excreción, por ejemplo, disminuiría la cantidad de días en los que una persona puede excretar el virus, lo que puede acortar la duración estimada del período infeccioso y ajustar el modelo a observaciones más estrictas.
+
+Cada parámetro de la distribución de excreción tiene un significado importante:\
+- Shape: Controla la forma de la distribución de excreción viral. Un valor de forma bajo significa que la mayoría de la excreción ocurre al principio del período infeccioso y disminuye rápidamente.\
+- Scale: Controla la dispersión de los días en que ocurre la excreción. Un valor de escala más alto indica que la excreción viral está distribuida en un rango más amplio de días.\
+- Max Range: Establece el límite superior de días en los que se considera que una persona excreta el virus. En este caso, se ha establecido un límite de 30 días para reflejar la posible duración máxima de la excreción.
+
+Del mismo modo, la variabilidad en la carga viral y el período de incubación también siguen distribuciones gamma con parámetros clave:\
+- Incubation Period: Modela el tiempo entre la infección y la aparición de síntomas, con un rango máximo de 10 días en este caso.\
+- Load Per Case: Se calibra a partir de un mínimo de 10 casos, y modela la cantidad de virus que un individuo excreta en total.\
+- Load Variation: Refleja las diferencias entre individuos en cuanto a la cantidad de virus que excretan, proporcionando una estimación de esa variabilidad.
+
+```{r}
+  wwtp_data <- ts_data %>%
+    dplyr::filter(WWTP == WWTP_focus)
+
+  # Convert filtered data to data.table
+  ww_data <- data.table::setDT(wwtp_data)
+  
+  # Select relevant columns and rename
+  ww_data <- ww_data[, .(date, concentration, flow)]
+  
+  # Initialize 'cases' with NA values (if relevant)
+  ww_data[sample(1:nrow(ww_data), 0.1 * nrow(ww_data)), cases := NA]
+
+  # Interpolate missing flow data using 'locf'
+  ww_data <- ww_data[
+    data.table::CJ(date = seq.Date(min(date), max(date), by = "day"), unique = TRUE),
+    on = .(date)
+  ]
+  data.table::setnafill(ww_data, type = "locf", cols = "flow")
+
+  # Remove duplicates based on date
+  ww_data <- ww_data[!duplicated(date), ]
+
+  # Prepare SARS_CoV_2_Houston list in a similar format as above
+  ww_sewer <- list(
+    measurements = ww_data[, .(date, concentration)],
+    flows = ww_data[, .(date, flow)],
+    cases = ww_data[, .(date, cases)]
+  )
+
+  # Model creation (similar to your original code)
+  ww_measurements <- model_measurements(
+    concentrations = concentrations_observe(measurements = ww_sewer$measurements),
+    noise = noise_estimate(),
+    LOD = LOD_none()
+  )
+
+  ww_sewage <- model_sewage(
+    flows = flows_observe(flows = ww_sewer$flows),
+    residence_dist = residence_dist_assume(residence_dist = c(1))
+  )
+
+  ww_sampling <- model_sampling(
+    sample_effects = sample_effects_none()
+  )
+
+  ww_shedding <- model_shedding(
+    shedding_dist = shedding_dist_assume(
+      get_discrete_gamma(gamma_shape = 0.929639, 
+                         gamma_scale = 7.241397, 
+                         maxX = 30),
+      shedding_reference = "symptom_onset"),
+    incubation_dist = incubation_dist_assume(get_discrete_gamma(gamma_shape = 8.5, 
+                                                                gamma_scale = 0.4, 
+                                                                maxX = 10)),
+    load_per_case = load_per_case_calibrate(cases = NULL, min_cases = 25), 
+    load_variation = load_variation_estimate()
+  )
+  
+  ww_infections <- model_infections(
+  generation_dist = generation_dist_assume(
+    get_discrete_gamma_shifted(gamma_mean = 3, 
+                               gamma_sd = 2.4, 
+                               maxX = 12)
+    ),
+  R = R_estimate_rw(),  # Use random walk instead of splines
+  seeding = seeding_estimate_rw(),
+  infection_noise = infection_noise_estimate()
+)
+
+
+  ww_forecast <- model_forecast(
+    horizon = horizon_assume(horizon = 30)
+  )
+
+  # Fit options
+  ww_fit_opts <- set_fit_opts(
+  model = model_stan_opts(package = "EpiSewer"),
+  sampler = sampler_stan_mcmc(
+    iter_warmup = 500,
+    iter_sampling = 500,
+    chains = 4,
+    parallel_chains = 4,
+    seed = 123
+  )
+)
+
+
+  ww_results_opts <- set_results_opts(
+    fitted = TRUE,
+    summary_intervals = c(0.5, 0.95),
+    samples_ndraws = 50
+  )
+
+  # Run EpiSewer for the WWTP
+  ww_result <- EpiSewer(
+    measurements = ww_measurements,
+    sampling = ww_sampling,
+    sewage = ww_sewage,
+    shedding = ww_shedding,
+    infections = ww_infections,
+    forecast = ww_forecast,
+    fit_opts = ww_fit_opts,
+    results_opts = ww_results_opts
+  )
+  
+```
+
+## Results
+
+This is the viral concentration concidering the flow of the wastewater. This will show the hypothetical concentration if the flow was at its median value. The normalization removes the noise due to the daily variation of flow. The remaining uncertainty is due to the measurement noise and other sources of variation. (From the website)
+
+```{r}
+# Plot the results list
+plot_concentration(ww_result, 
+                       measurements = ww_sewer$measurements, 
+                       flows = ww_sewer$flows, 
+                       normalized = TRUE) 
+
+# transform the measurements to gc/day
+ww_sewer$measurements <- ww_sewer$measurements %>%
+  mutate(concentration = log(concentration))
+
+# Plot the results list
+plot_concentration(ww_result, 
+                       measurements = ww_sewer$measurements, 
+                       flows = ww_sewer$flows, 
+                       normalized = FALSE) 
+
+```
+
+Absolute concentrations of SARS-CoV-2 in wastewater samples from Houston, Texas, USA. This plot shows the viral concentration (e.g., gene copies per liter) exactly as it was measured, without any adjustments. (From the website)
+
+```{r}
+# Plot the results list
+plot_concentration(ww_result, measurements = ww_sewer$measurements, flows = ww_sewer$flows, normalized = FALSE) +
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+$R_t < 1$: Indicates that the outbreak is under control and will eventually subside.
+
+$R_t = 1$: Indicates that the outbreak is stable, with the number of new cases remaining constant over time.
+
+$R_t > 1$: Indicates that the outbreak is growing, with the number of new cases increasing.
+
+```{r}
+# Generate Rt plot with forecast
+plot_R(ww_result, forecast = TRUE) +
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate date labels
+      labs(title = "Estimated Effective Reproduction Number (Rt) Over Time",  # Add title
+           x = "Date", y = "Effective Reproduction Number (Rt)")  # Add axis labels
+
+plot_R(ww_result, forecast = FALSE) +
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate date labels
+      labs(title = "Estimated Effective Reproduction Number (Rt) Over Time",  # Add title
+           x = "Date", y = "Effective Reproduction Number (Rt)")  # Add axis labels
+```
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| message: false
+#| code-fold: true
+#| label: R-tabs
+
+iwalk(R_plots, ~ {
+  cat('##### ', .y, '\n\n')
+  
+  print(.x)
+  
+  cat('\n\n')
+  
+})
+
+```
+:::
+
+1.  log10cpl:
+
+-   La transformación logarítmica comprime el rango de los datos, suavizando las fluctuaciones.
+
+-   La estimación de (R_t) parece casi constante debido a la menor sensibilidad a los cambios en los valores de concentración.
+
+-   Esta transformación es útil cuando los datos abarcan varios órdenes de magnitud, haciendo que las tendencias parezcan más estables.
+
+2.  Cpl sin transformar:
+
+```         
+-   Al cambiar a valores de concentración sin transformar, se introduce una mayor variabilidad en los datos.
+-   El modelo detecta fluctuaciones más pronunciadas, resultando en un (R_t) más dinámico y fluctuante.
+-   Este enfoque refleja las variaciones naturales en los datos, capturando más detalles en los cambios de tasas de transmisión.
+```
+
+En pocas palabras, la transformación logarítmica reduce el impacto de los valores altos, aplanando las tendencias. Los valores sin transformar son más sensibles a las fluctuaciones, lo que genera una estimación de (R_t) más reactiva.
+
+```{r}
+plot_load(ww_result) +
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+plot_infections(ww_result)+
+      scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+names(ww_result)
+names(ww_result$job)
+head(ww_result$summary$R, 5)
+ww_result$fitted$diagnostic_summary()
+ww_result$checksums
+```
