@@ -4,7 +4,7 @@ format: html
 editor: visual
 ---
 
-## Libraries
+# Libraries
 
 ```{r}
 #| results: asis
@@ -32,9 +32,10 @@ library(qcc)
 library(ggnewscale)
 library(remotes)
 library(EpiSewer)
+library(ern)
 ```
 
-## Description of the data
+# Description of the data
 
 The data consists of synthetic time series data based on the observations of SARS-CoV-2 concentrations in wastewater samples collected from the wastewater treatment plant (WWTP) in 69th Street at Houston, Texas, USA. The data includes the date of collection, the WWTP from which the sample was collected, the log10-transformed concentration of SARS-CoV-2 RNA copies per liter (log10cpl), and other relevant information.
 
@@ -42,7 +43,7 @@ The goal is to analyze the data using the EpiSewer package to estimate the dynam
 
 The cases data is not available, so we will initialize an empty column for cases in the data.
 
-## 1. Data Processing
+# 1. Data Processing
 
 The total viral load, $\pi_t$, is calculated as:
 
@@ -52,9 +53,9 @@ Where:
 
 -   $\pi_t$: Total viral load (gc/day) on day $t$.
 
--   $C_t$: Viral concentration (gc/L).
+-   $C_t$: Viral concentration (gc/mL).
 
--   $\text{flow}_t$: Flow rate (L/day).
+-   $\text{flow}_t$: Flow rate (mL/day).
 
 ```{r}
 #| results: asis
@@ -103,7 +104,7 @@ ww_data <- ww_data[, .(date, concentration, flow)]
 ww_data[, total_viral_load := concentration * flow]
 ```
 
-## 2. Initialize cases Column with NA Values
+# 2. Initialize cases Column with NA Values
 
 -   Adds a cases column and assigns NA values to 10% of rows to simulate missing data. This prepares the data to handle gaps in case data, modeling realistic missing data scenarios.
 
@@ -121,7 +122,7 @@ Comment: Although the package indicates that the cases column is optional, it is
 ww_data[sample(1:nrow(ww_data), 0.1 * nrow(ww_data)), cases := NA]
 ```
 
-## 3. Interpolate Missing Flow Data Using locf
+# 3. Interpolate Missing Flow Data Using locf
 
 -   Interpolates missing flow data using the last observation carried forward (locf) method, which fills missing values with the last observed value. This ensures that the flow data is continuous and complete, which is essential for accurate modeling and forecasting.
 
@@ -153,7 +154,7 @@ data.table::setnafill(ww_data, type = "locf", cols = "flow")
 ww_data <- ww_data[!duplicated(date), ]
 ```
 
-## 5. Create EpiSewer Input List
+# 5. Create EpiSewer Input List
 
 -   Creates an input list for EpiSewer containing the wastewater measurements, flow data, and cases data. This prepares the data for modeling the dynamics of the disease outbreak in the city based on the wastewater surveillance data.
 
@@ -177,7 +178,7 @@ ww_sewer <- list(
   )
 ```
 
-## 6. Define the Measurement Model
+# 6. Define the Measurement Model
 
 Specifies the measurement model for concentrations and includes observed noise. We assume there is no limit of detection (LOD_none()), meaning all measurements are detectable.
 
@@ -216,7 +217,7 @@ ww_sewage <- model_sewage(
   )
 ```
 
-## 8. Sampling Model
+# 8. Sampling Model
 
 -   Specifies the sampling model, assuming no sample effects. The sampling process does not affect the observed data.
 
@@ -234,7 +235,7 @@ ww_sampling <- model_sampling(
   )
 ```
 
-## 9. Shedding Model
+# 9. Shedding Model
 
 Expected Symptom Onsets ($\lambda_t$):
 
@@ -353,7 +354,7 @@ ww_infections_spline <- model_infections(
 )
 ```
 
-## 11. Assumptions
+# 11. Assumptions
 
 The following are hard assumptions made in the model:
 
@@ -383,7 +384,7 @@ $\textbf{No Clinical Case Data}$: Model operates based solely on wastewater data
 
 Comment: Notice that the model assumes that the minimum number of cases is 25. Therefore, although the cases column is initialized with NA values, the model requires a minimum number of cases to be present.
 
-## 10. Forecast Model
+# 10. Forecast Model
 
 -   Predicts up to 7 days into the future using posterior estimates of $R_t$ and other parameters.
 
@@ -401,7 +402,7 @@ ww_forecast <- model_forecast(
   )
 ```
 
-## 11. Fitting with MCMC
+# 11. Fitting with MCMC
 
 $\textbf{Method}$: Uses Stan-based MCMC for Bayesian inference.
 
@@ -419,20 +420,22 @@ $\textbf{Configuration}$: 250 warm-up iterations, 250 sampling iterations, with 
 ww_fit_opts <- set_fit_opts(
   model = model_stan_opts(package = "EpiSewer"),
   sampler = sampler_stan_mcmc(
-    iter_warmup = 500,
-    iter_sampling = 500,
-    chains = 4,
-    parallel_chains = 4,
+    iter_warmup = 250,
+    iter_sampling = 250,
+    chains = 2,
+    parallel_chains = 2,
     seed = 123
   )
 )
 ```
 
-## 12. Results Options and Episewer Run
+# 12. Results Options and Episewer Run
 
 Defines the 50% and 95% credibility intervals, with a total of 50 samples drawn for result evaluation.
 
 Finally, the EpiSewer model is executed for the selected wastewater treatment plant with all previously defined components and settings.
+
+The model employs Hamiltonian MCMC (via Stan), making it more computationally intensive to estimate latent variables. An alternative to `EpiSewer` for estimating the reproduction number is the `ern` package, which offers a more straightforward approach to estimating $R_t$ through simple deconvolution.
 
 ```{r}
 #| results: asis
@@ -597,10 +600,10 @@ ww_forecast <- model_forecast(
 ww_fit_opts <- set_fit_opts(
   model = model_stan_opts(package = "EpiSewer"),
   sampler = sampler_stan_mcmc(
-    iter_warmup = 500,
-    iter_sampling = 500,
-    chains = 4,
-    parallel_chains = 4,
+    iter_warmup = 250,
+    iter_sampling = 250,
+    chains = 2,
+    parallel_chains = 2,
     seed = 123
   )
 )
@@ -636,11 +639,13 @@ ww_result_log10_rw <- EpiSewer(
 #   )
 ```
 
-## 13. Results
+# 13. Results
 
-The concentration plots show the viral load in the wastewater over time, with and without normalization by flow. The normalized concentration plot removes the noise due to daily flow variation, allowing for a clearer view of the viral load dynamics.
+## 13.1. Concentration Plots
 
-We include the concentration plots for the original and log10-transformed data to compare the results. The log10 transformation is useful transformation since it compresses the data range and reduce the impact of large variations.
+The concentration plots illustrate the viral load in wastewater over time, both with and without normalization by flow. Normalizing the data reduces noise from daily flow fluctuations, offering a clearer perspective on viral load dynamics. We present both the original and log10-transformed concentration plots for comparison and include forecasts with a 7-day horizon to project viral load trends into the future.
+
+The concentration plot for the original data shows distinct peaks, which may correspond to periods of heightened viral load in the community. The normalized concentration plot displays a smoother curve, helping to highlight trends over time. The log10-transformed concentration plot compresses the data range and minimizes the impact of large variations, making it easier to observe underlying patterns. In the normalized log10 concentration plot, periods of high viral load in the community remain detectable.
 
 ::: panel-tabset
 ```{r}
@@ -759,6 +764,14 @@ purrr::iwalk(concentration_plots_list, ~ {
 ```
 :::
 
+## 13.2. Effective Reproduction Number (Rt) Plot
+
+The $R_t$ plot shows the estimated effective reproduction number over time based on the wastewater surveillance data. The $R_t$ values provide insights into the dynamics of the SARS-CoV-2 outbreak, indicating whether the virus is spreading, stable, or declining.
+
+The $R_t$ plot shows fluctuations in the effective reproduction number over time, reflecting changes in the transmission dynamics of the virus. However, the forecast with a 7-day horizon provide implied that the outbreak is declining, with $R_t$ values below 1, indicating a decreasing trend in new infections.
+
+In this analysis, we use a random walk to estimate $R_t$. However, other methods, such as spline, can also be used to estimate $R_t$ based on the data. Additionally, the results for the reproduction number using the log10-transformed data do not accurately reflect the outbreak dynamics, as they remain constant around a single value, failing to capture details in the transmission rate due to the logarithmic scale.
+
 ::: panel-tabset
 ```{r}
 #| results: asis
@@ -801,6 +814,12 @@ purrr::iwalk(Rt_plot_list, ~ {
 ```
 :::
 
+## 13.3. Viral Load and Infection Plots
+
+We can analyze the total viral load and the log10-transformed total viral load over time to understand the dynamics of the virus in the wastewater system. The total viral load represents the cumulative viral particles present in the wastewater, reflecting the overall viral shedding in the community. Both follow a similar pattern to the concentration plots.
+
+On the other hand, the infection plots show the estimated number of infections over time based on the wastewater surveillance data. Furthermore, we can see a clear similarity between the trends of load and infections, with the peaks of loads occurring a little earlier. This is interpreted as load being a delayed signal of infections. It should be noted that infections are used more as a diagnosis than as a prognosis.
+
 ::: panel-tabset
 ```{r}
 #| results: asis
@@ -815,30 +834,30 @@ purrr::iwalk(Rt_plot_list, ~ {
 Load_rw <- plot_load(ww_result_rw) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  # Fix overlapping dates
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  # Rotate date labels
-      labs(title = "Estimated Viral Load Over Time (Random Walk)", 
-           x = "Date", y = "Viral Load [gc/mL]")
+      labs(title = "Estimated Viral Load Over Time", 
+           x = "Date", y = "Viral Load [gc/day]")
 
 # Load_spline <- plot_load(ww_result_spline) +
 #       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") + 
 #       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#       labs(title = "Estimated Viral Load Over Time (Spline)", 
-#            x = "Date", y = "Viral Load [gc/mL]")
+#       labs(title = "Estimated Viral Load Over Time ", 
+#            x = "Date", y = "Viral Load [gc/day]")
 
 Load_log10_rw <- plot_load(ww_result_log10_rw) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Log10-Transformed Viral Load Over Time (Random Walk)", 
-           x = "Date", y = "Log10(Viral Load)")
+      labs(title = "Log10-Transformed Viral Load Over Time", 
+           x = "Date", y = "Viral Load [gc/day]")
 
 # Load_log10_spline <- plot_load(ww_result_log10_spline) +
 #       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +
 #       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-#       labs(title = "Log10-Transformed Viral Load Over Time (Spline)", 
-#            x = "Date", y = "Log10(Viral Load)")
+#       labs(title = "Log10-Transformed Viral Load Over Time ", 
+#            x = "Date", y = "Viral Load [gc/day]")
 
 Load_plot_list <- list(Load_rw,  Load_log10_rw) #, Load_spline, Load_log10_spline)
 
-names(Load_plot_list) <- c("Load Random Walk",  "Load Log10 Random Walk") #, "Load Spline", "Load Log10 Spline")
+names(Load_plot_list) <- c("Total Load",  "Total Load Log10") #, "Load Spline", "Load Log10 Spline")
 
 purrr::iwalk(Load_plot_list, ~ {
    cat('##### ', .y, '\n\n')
@@ -865,7 +884,7 @@ purrr::iwalk(Load_plot_list, ~ {
 Infection_rw <- plot_infections(ww_result_rw) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Estimated Infections Over Time (Random Walk)", 
+      labs(title = "Estimated Infections Over Time", 
            x = "Date", y = "Infections")
 
 # Infection_spline <- plot_infections(ww_result_spline) +
@@ -889,8 +908,8 @@ Infection_log10_rw <- plot_infections(ww_result_log10_rw) +
 Infection_plot_list <- list(Infection_rw,  
                             Infection_log10_rw) #, Infection_spline, Infection_log10_spline)
 
-names(Infection_plot_list) <- c("Infection Random Walk", 
-                                "Infection Log10 Random Walk") #, "Infection Spline", "Infection Log10 Spline")
+names(Infection_plot_list) <- c("Infection", 
+                                "Infection Log10") #, "Infection Spline", "Infection Log10 Spline")
 
 purrr::iwalk(Infection_plot_list, ~ {
    cat('##### ', .y, '\n\n')
@@ -905,6 +924,8 @@ purrr::iwalk(Infection_plot_list, ~ {
 
 ## 14. Diagnosicstic Summary
 
+The diagnostic summary provides an overview of the MCMC sampling process, including the number of divergent transitions, maximum tree depth reached, and the Energy-Bayesian Fraction of Missing Information (E-BFMI). These metrics help assess the efficiency and reliability of the sampling process.
+
 ```{r}
 #| results: asis
 #| warning: false
@@ -916,7 +937,6 @@ purrr::iwalk(Infection_plot_list, ~ {
 
 
 ww_result_rw$fitted$diagnostic_summary()
-# ww_result_spline$fitted$diagnostic_summary()
 ```
 
 +--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -925,24 +945,12 @@ ww_result_rw$fitted$diagnostic_summary()
 | `num_divergent`: Number of Divergent Transitions                   | Divergences indicate areas where the sampler failed to approximate the target distribution accurately, often due to issues with step size resolution.                                                                                                         | Chain 1: 0      | No divergent transitions were detected in any of the chains, suggesting that the sampler did not encounter issues with the step size resolution.                                              |
 |                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
 |                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 0      |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 3: 0      |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 4: 0      |                                                                                                                                                                                               |
 +--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | `num_max_treedepth`: Number of Transitions Reaching Max Tree Depth | The metric indicates how often each chain reaches the maximum tree depth, suggesting that the NUTS sampler is terminating early to control time complexity.                                                                                                   | Chain 1: 0      | No transitions reached the maximum tree depth in any of the chains, suggesting that the sampler was able to explore the target distributions without efficiency issues related to tree depth. |
 |                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
 |                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 0      |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 3: 0      |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 4: 0      |                                                                                                                                                                                               |
 +--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| `ebfmi`: Energy-Bayesian Fraction of Missing Information           | The metric indicates the efficiency of the sampler in exploring the target distribution. Low values indicate that the sampler is moving inefficiently through the high-probability regions of the distribution, which can affect the quality of the sampling. | Chain 1: 1.0276 | All E-BFMI values are above 0.8, suggesting that the sampler explored the target distributions efficiently.                                                                                   |
+| `ebfmi`: Energy-Bayesian Fraction of Missing Information           | The metric indicates the efficiency of the sampler in exploring the target distribution. Low values indicate that the sampler is moving inefficiently through the high-probability regions of the distribution, which can affect the quality of the sampling. | Chain 1: 0.986  | All E-BFMI values are above 0.8, suggesting that the sampler explored the target distributions efficiently.                                                                                   |
 |                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 0.8686 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 3: 0.8890 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 4: 0.8758 |                                                                                                                                                                                               |
+|                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 1.1549 |                                                                                                                                                                                               |
 +--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
