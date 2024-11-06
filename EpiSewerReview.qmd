@@ -1,6 +1,16 @@
 ---
 title: "EpiSewer Review"
-format: html
+author: "Jose Palacio"
+format:
+  html:
+    other-links:
+      - text: EpiSewer Public Github Repository
+        href: https://github.com/adrian-lison/EpiSewer
+      - text: EpiSewer Documentation
+        href: https://adrian-lison.github.io/EpiSewer/
+    toc: true
+    html-math-method: katex
+    css: styles.css
 editor: visual
 ---
 
@@ -32,7 +42,6 @@ library(qcc)
 library(ggnewscale)
 library(remotes)
 library(EpiSewer)
-library(ern)
 ```
 
 # Description of the data
@@ -647,14 +656,13 @@ The concentration plots illustrate the viral load in wastewater over time, both 
 
 The concentration plot for the original data shows distinct peaks, which may correspond to periods of heightened viral load in the community. The normalized concentration plot displays a smoother curve, helping to highlight trends over time. The log10-transformed concentration plot compresses the data range and minimizes the impact of large variations, making it easier to observe underlying patterns. In the normalized log10 concentration plot, periods of high viral load in the community remain detectable.
 
-::: panel-tabset
 ```{r}
 #| results: asis
-#| warning: false
+#| warning: true
 #| echo: true
-#| message: false
+#| message: true
 #| code-fold: true
-#| outout: false
+#| outout: true
 #| label: Concentration Plots
 
 # Concentration plot
@@ -664,7 +672,7 @@ concentration_rw_plot <- plot_concentration(ww_result_rw,
                                          normalized = FALSE) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Viral Concentration Over Time (Random Walk)")
+      labs(title = "Viral Concentration Over Time")
 
 # Normalized Concentration plot
 concentration_rw_norm_plot <- plot_concentration(ww_result_rw, 
@@ -673,7 +681,7 @@ concentration_rw_norm_plot <- plot_concentration(ww_result_rw,
                                              normalized = TRUE) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Normalized Viral Concentration Over Time (Random Walk)")
+      labs(title = "Normalized Viral Concentration Over Time")
 
 # Log10 Concentration plot
 concentration_rw_plot_log10 <- plot_concentration(ww_result_log10_rw, 
@@ -682,7 +690,7 @@ concentration_rw_plot_log10 <- plot_concentration(ww_result_log10_rw,
                                               normalized = FALSE) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Log10-Transformed Viral Concentration (Random Walk)")
+      labs(title = "Log10-Transformed Viral Concentration")
 
 # Normalized Log10 Concentration plot
 concentration_rw_norm_plot_log10 <- plot_concentration(ww_result_log10_rw, 
@@ -691,7 +699,7 @@ concentration_rw_norm_plot_log10 <- plot_concentration(ww_result_log10_rw,
                                                   normalized = TRUE) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Log10-Transformed Normalized Viral Concentration (Random Walk)")
+      labs(title = "Log10-Transformed Normalized Viral Concentration")
 
 # # Concentration plot for Spline
 # concentration_spline_plot <- plot_concentration(ww_result_spline, 
@@ -741,15 +749,26 @@ concentration_plots_list <- list(concentration_rw_plot,
                                 )
 
 # Add names to the plots in the list
-names(concentration_plots_list) <- c("Concentration Random Walk", 
-                                    "Normalized Concentration Random Walk",
-                                    "Concentration (log10) Random Walk", 
-                                    "Normalized Concentration (log10) Random Walk" #, 
+names(concentration_plots_list) <- c("Concentration", 
+                                    "Normalized Concentration ",
+                                    "Concentration (log10) ", 
+                                    "Normalized Concentration (log10) " #, 
                                     # "Concentration Spline", 
                                     # "Normalized Concentration Spline",
                                     # "Concentration (log10) Spline", 
                                     # "Normalized Concentration (log10) Spline"
                                     )
+
+```
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| echo: true
+#| code-fold: true
+#| message: false
+#| label: Concentration Plots-tabs
 
 # Display each plot with a section header
 purrr::iwalk(concentration_plots_list, ~ {
@@ -760,7 +779,6 @@ purrr::iwalk(concentration_plots_list, ~ {
    cat('\n\n')
   
  })
-
 ```
 :::
 
@@ -772,21 +790,21 @@ The $R_t$ plot shows fluctuations in the effective reproduction number over time
 
 In this analysis, we use a random walk to estimate $R_t$. However, other methods, such as spline, can also be used to estimate $R_t$ based on the data. Additionally, the results for the reproduction number using the log10-transformed data do not accurately reflect the outbreak dynamics, as they remain constant around a single value, failing to capture details in the transmission rate due to the logarithmic scale.
 
-::: panel-tabset
+
 ```{r}
 #| results: asis
-#| warning: false
+#| warning: true
 #| echo: true
 #| message: false
 #| code-fold: true
-#| outout: false
+#| outout: true
 #| label: R_t Plots
 
 # Effective Reproduction Number (Rt) for Random Walk
 Rt_rw <- plot_R(ww_result_rw, forecast = TRUE) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +  
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +  
-      labs(title = "Estimated Effective Reproduction Number (Rt) Over Time (Random Walk)",  
+      labs(title = "Estimated Effective Reproduction Number (Rt) Over Time",  
            x = "Date", y = "Effective Reproduction Number (Rt)") 
 
 # # Effective Reproduction Number (Rt) for Spline
@@ -800,8 +818,16 @@ Rt_rw <- plot_R(ww_result_rw, forecast = TRUE) +
 Rt_plot_list <- list(Rt_rw) #, Rt_spline)
 
 # Add names to the plots in the list
-names(Rt_plot_list) <- c("Rt Random Walk") #, "Rt Spline")
+names(Rt_plot_list) <- c("Rt") #, "Rt Spline")
+```
 
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| echo: false
+#| message: false
+#| label: R_t Plots-tabs
 # Display each plot with a section header
 purrr::iwalk(Rt_plot_list, ~ {
    cat('##### ', .y, '\n\n')
@@ -820,12 +846,11 @@ We can analyze the total viral load and the log10-transformed total viral load o
 
 On the other hand, the infection plots show the estimated number of infections over time based on the wastewater surveillance data. Furthermore, we can see a clear similarity between the trends of load and infections, with the peaks of loads occurring a little earlier. This is interpreted as load being a delayed signal of infections. It should be noted that infections are used more as a diagnosis than as a prognosis.
 
-::: panel-tabset
 ```{r}
 #| results: asis
-#| warning: false
+#| warning: true
 #| echo: true
-#| message: false
+#| message: true
 #| code-fold: true
 #| outout: true
 #| label: Loads Plots
@@ -858,6 +883,15 @@ Load_log10_rw <- plot_load(ww_result_log10_rw) +
 Load_plot_list <- list(Load_rw,  Load_log10_rw) #, Load_spline, Load_log10_spline)
 
 names(Load_plot_list) <- c("Total Load",  "Total Load Log10") #, "Load Spline", "Load Log10 Spline")
+```
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| echo: false
+#| message: false
+#| label: Loads Plots-tabs
 
 purrr::iwalk(Load_plot_list, ~ {
    cat('##### ', .y, '\n\n')
@@ -870,12 +904,11 @@ purrr::iwalk(Load_plot_list, ~ {
 ```
 :::
 
-::: panel-tabset
 ```{r}
 #| results: asis
-#| warning: false
+#| warning: true
 #| echo: true
-#| message: false
+#| message: true
 #| code-fold: true
 #| outout: true
 #| label: Infection Plots
@@ -896,7 +929,7 @@ Infection_rw <- plot_infections(ww_result_rw) +
 Infection_log10_rw <- plot_infections(ww_result_log10_rw) +
       scale_x_date(date_labels = "%b %Y", date_breaks = "1 months") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-      labs(title = "Log10-Transformed Infections Over Time (Random Walk)", 
+      labs(title = "Log10-Transformed Infections Over Time", 
            x = "Date", y = "Infections")
 
 # Infection_log10_spline <- plot_infections(ww_result_log10_spline) +
@@ -911,6 +944,16 @@ Infection_plot_list <- list(Infection_rw,
 names(Infection_plot_list) <- c("Infection", 
                                 "Infection Log10") #, "Infection Spline", "Infection Log10 Spline")
 
+```
+
+::: panel-tabset
+```{r}
+#| results: asis
+#| warning: false
+#| echo: false
+#| message: false
+#| label: Infection Plots-tabs
+
 purrr::iwalk(Infection_plot_list, ~ {
    cat('##### ', .y, '\n\n')
   
@@ -922,7 +965,7 @@ purrr::iwalk(Infection_plot_list, ~ {
 ```
 :::
 
-## 14. Diagnosicstic Summary
+## 13.4. Diagnosicstic Summary
 
 The diagnostic summary provides an overview of the MCMC sampling process, including the number of divergent transitions, maximum tree depth reached, and the Energy-Bayesian Fraction of Missing Information (E-BFMI). These metrics help assess the efficiency and reliability of the sampling process.
 
@@ -939,18 +982,34 @@ The diagnostic summary provides an overview of the MCMC sampling process, includ
 ww_result_rw$fitted$diagnostic_summary()
 ```
 
-+--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Diagnostic                                                         | Description                                                                                                                                                                                                                                                   | Results         | Interpretation                                                                                                                                                                                |
-+:===================================================================+:==============================================================================================================================================================================================================================================================+:================+:==============================================================================================================================================================================================+
-| `num_divergent`: Number of Divergent Transitions                   | Divergences indicate areas where the sampler failed to approximate the target distribution accurately, often due to issues with step size resolution.                                                                                                         | Chain 1: 0      | No divergent transitions were detected in any of the chains, suggesting that the sampler did not encounter issues with the step size resolution.                                              |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 0      |                                                                                                                                                                                               |
-+--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| `num_max_treedepth`: Number of Transitions Reaching Max Tree Depth | The metric indicates how often each chain reaches the maximum tree depth, suggesting that the NUTS sampler is terminating early to control time complexity.                                                                                                   | Chain 1: 0      | No transitions reached the maximum tree depth in any of the chains, suggesting that the sampler was able to explore the target distributions without efficiency issues related to tree depth. |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 0      |                                                                                                                                                                                               |
-+--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| `ebfmi`: Energy-Bayesian Fraction of Missing Information           | The metric indicates the efficiency of the sampler in exploring the target distribution. Low values indicate that the sampler is moving inefficiently through the high-probability regions of the distribution, which can affect the quality of the sampling. | Chain 1: 0.986  | All E-BFMI values are above 0.8, suggesting that the sampler explored the target distributions efficiently.                                                                                   |
-|                                                                    |                                                                                                                                                                                                                                                               |                 |                                                                                                                                                                                               |
-|                                                                    |                                                                                                                                                                                                                                                               | Chain 2: 1.1549 |                                                                                                                                                                                               |
-+--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Diagnostic                                                         | Description                                                                                                                                                                                                                                                   | Results                 | Interpretation                                                                                                                                            |
++:===================================================================+:==============================================================================================================================================================================================================================================================+:========================+:==========================================================================================================================================================+
+| `num_divergent`: Number of Divergent Transitions                   | Divergences indicate areas where the sampler failed to approximate the target distribution accurately, often due to issues with step size resolution.                                                                                                         | | Chain | Transitions | | No divergent transitions were detected in any of the chains, suggesting that the sampler did not encounter issues with the step size resolution.          |
+|                                                                    |                                                                                                                                                                                                                                                               | |-------|-------------| |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 1     | 0           | |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 2     | 0           | |                                                                                                                                                           |
++--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+
+| `num_max_treedepth`: Number of Transitions Reaching Max Tree Depth | The metric indicates how often each chain reaches the maximum tree depth, suggesting that the NUTS sampler is terminating early to control time complexity.                                                                                                   | | Chain | Transitions | | No transitions reached the maximum tree depth in any of the chains, suggesting that the sampler was able to explore the target distributions efficiently. |
+|                                                                    |                                                                                                                                                                                                                                                               | |-------|-------------| |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 1     | 0           | |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 2     | 0           | |                                                                                                                                                           |
++--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+
+| `ebfmi`: Energy-Bayesian Fraction of Missing Information           | The metric indicates the efficiency of the sampler in exploring the target distribution. Low values indicate that the sampler is moving inefficiently through the high-probability regions of the distribution, which can affect the quality of the sampling. | | Chain | Value  |      | All E-BFMI values are above 0.8, suggesting that the sampler explored the target distributions efficiently.                                               |
+|                                                                    |                                                                                                                                                                                                                                                               | |-------|--------|      |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 1     | 0.986  |      |                                                                                                                                                           |
+|                                                                    |                                                                                                                                                                                                                                                               | | 2     | 1.1549 |      |                                                                                                                                                           |
++--------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+### References
+
+- Adrian Lison. Adrian-lison/episewer: Episewer 0.0.1. v0.0.1, Zenodo, 25 Jan. 2024, doi:10.5281/zenodo.10569102.
+
+- Lison, Adrian. EpiSewer. Version 0.0.3, 2024, https://adrian-lison.github.io/EpiSewer/index.html.
+
+- Stan Development Team. CmdStan User’s Guide. Version 2.24, 2020, https://mc-stan.org/docs/2_24/cmdstan-guide-2_24.pdf.
+
+- Champredon D, Papst I, Yusuf W (2024) ern: An R package to estimate the effective reproduction number using clinical and wastewater surveillance data. PLoS ONE 19(6): e0305550. https://doi.org/10.1371/journal.pone.0305550.
+
+
+
