@@ -10,7 +10,7 @@ format:
         href: https://adrian-lison.github.io/EpiSewer/
     toc: true
     html-math-method: katex
-    css: styles.css
+    theme: journal
 editor: visual
 ---
 
@@ -117,7 +117,7 @@ ww_data[, total_viral_load := concentration * flow]
 
 -   Adds a cases column and assigns NA values to 10% of rows to simulate missing data. This prepares the data to handle gaps in case data, modeling realistic missing data scenarios.
 
-Comment: Although the package indicates that the cases column is optional, it is important to consider it for analyzing the virus spread.
+-  Comment: Although the package indicates that the cases column is optional, it is important to consider it for analyzing the virus spread.
 
 ```{r}
 #| results: asis
@@ -163,13 +163,13 @@ data.table::setnafill(ww_data, type = "locf", cols = "flow")
 ww_data <- ww_data[!duplicated(date), ]
 ```
 
-# 5. Create EpiSewer Input List
+# 4. Create EpiSewer Input List
 
 -   Creates an input list for EpiSewer containing the wastewater measurements, flow data, and cases data. This prepares the data for modeling the dynamics of the disease outbreak in the city based on the wastewater surveillance data.
 
 -   Organizes measurements, flows, and cases into a list (ww_sewer) required by the model. Organizing data this way aligns with the expected structure for EpiSewer input.
 
--Comment: Although the cases data is optional, the EpiSewer package still requires it to be included in the input list. If we have no data on cases, we can initialize the column with NA values as done in the previous step.
+-  Comment: Although the cases data is optional, the EpiSewer package still requires it to be included in the input list. If we have no data on cases, we can initialize the column with NA values as done in the previous step.
 
 ```{r}
 #| results: asis
@@ -187,7 +187,7 @@ ww_sewer <- list(
   )
 ```
 
-# 6. Define the Measurement Model
+# 5. Define the Measurement Model
 
 Specifies the measurement model for concentrations and includes observed noise. We assume there is no limit of detection (LOD_none()), meaning all measurements are detectable.
 
@@ -207,9 +207,9 @@ ww_measurements <- model_measurements(
   )
 ```
 
-## 7. Define the Sewage Model
+## 6. Define the Sewage Model
 
--   Specifies the sewage model, including the observed flow data and the assumed residence distribution. The residence distribution represents the time it takes for wastewater to travel from the source to the sampling point. Virus remains in the wastewater system for one day before being eliminated.
+Specifies the sewage model, including the observed flow data and the assumed residence distribution. The residence distribution represents the time it takes for wastewater to travel from the source to the sampling point. Virus remains in the wastewater system for one day before being eliminated.
 
 ```{r}
 #| results: asis
@@ -226,9 +226,9 @@ ww_sewage <- model_sewage(
   )
 ```
 
-# 8. Sampling Model
+# 7. Sampling Model
 
--   Specifies the sampling model, assuming no sample effects. The sampling process does not affect the observed data.
+Specifies the sampling model, assuming no sample effects. The sampling process does not affect the observed data.
 
 ```{r}
 #| results: asis
@@ -244,7 +244,7 @@ ww_sampling <- model_sampling(
   )
 ```
 
-# 9. Shedding Model
+# 8. Shedding Model
 
 Expected Symptom Onsets ($\lambda_t$):
 
@@ -363,7 +363,7 @@ ww_infections_spline <- model_infections(
 )
 ```
 
-# 11. Assumptions
+# 9. Assumptions
 
 The following are hard assumptions made in the model:
 
@@ -463,16 +463,6 @@ ww_results_opts <- set_results_opts(
   )
 
 # Run EpiSewer for the WWTP
-ww_result_rw <- EpiSewer(
-    measurements = ww_measurements,
-    sampling = ww_sampling,
-    sewage = ww_sewage,
-    shedding = ww_shedding,
-    infections = ww_infections_rw,
-    forecast = ww_forecast,
-    fit_opts = ww_fit_opts,
-    results_opts = ww_results_opts
-  )
 
 # ww_result_spline <- EpiSewer(
 #     measurements = ww_measurements,
@@ -484,14 +474,25 @@ ww_result_rw <- EpiSewer(
 #     fit_opts = ww_fit_opts,
 #     results_opts = ww_results_opts
 #   )
+
+ww_result_rw <- EpiSewer(
+    measurements = ww_measurements,
+    sampling = ww_sampling,
+    sewage = ww_sewage,
+    shedding = ww_shedding,
+    infections = ww_infections_rw,
+    forecast = ww_forecast,
+    fit_opts = ww_fit_opts,
+    results_opts = ww_results_opts
+  )
 ```
 
 ```{r}
 #| results: asis
 #| warning: false
-#| echo: true
+#| echo: false
 #| message: false
-#| code-fold: true
+#| code-fold: false
 #| outout: false
 #| cache: true
 #| label: Data Processing with log10
@@ -625,17 +626,6 @@ ww_results_opts <- set_results_opts(
 
 # Run EpiSewer for the WWTP
 
-ww_result_log10_rw <- EpiSewer(
-    measurements = ww_measurements_log10,
-    sampling = ww_sampling,
-    sewage = ww_sewage_log10,
-    shedding = ww_shedding,
-    infections = ww_infections_rw,
-    forecast = ww_forecast,
-    fit_opts = ww_fit_opts,
-    results_opts = ww_results_opts
-  )
-
 # ww_result_log10_spline <- EpiSewer(
 #     measurements = ww_measurements_log10,
 #     sampling = ww_sampling,
@@ -646,6 +636,17 @@ ww_result_log10_rw <- EpiSewer(
 #     fit_opts = ww_fit_opts,
 #     results_opts = ww_results_opts
 #   )
+
+ww_result_log10_rw <- EpiSewer(
+    measurements = ww_measurements_log10,
+    sampling = ww_sampling,
+    sewage = ww_sewage_log10,
+    shedding = ww_shedding,
+    infections = ww_infections_rw,
+    forecast = ww_forecast,
+    fit_opts = ww_fit_opts,
+    results_opts = ww_results_opts
+  )
 ```
 
 # 13. Results
